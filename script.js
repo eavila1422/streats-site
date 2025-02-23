@@ -77,7 +77,7 @@ navigator.geolocation.getCurrentPosition(position => {
   }
 }, () => {
   console.log("Geolocation failed, using fallback location");
-  map = L.map('map').setView([51.505, -0.09], 13);
+  map = L.map('map').setView([51.505, -0-09], 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
   }).addTo(map);
@@ -95,7 +95,9 @@ function showForm() {
 
 async function geocodeAddress(address) {
   try {
-    const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`);
+    // Add country code and bounding box near Chicago/Cicero (~41.8 to 41.9, -87.8 to -87.7)
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=us&viewbox=-87.8,41.8,-87.7,41.9&bounded=1`;
+    const response = await fetch(url);
     const data = await response.json();
     console.log("Geocoding response for:", address, "Raw data:", data);
     if (data && data.length > 0) {
