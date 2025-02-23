@@ -5,25 +5,154 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    body { margin: 0; font-family: 'Arial', sans-serif; background-color: #f9e9d8; color: #333; }
-    .container { max-width: 1200px; margin: 0 auto; padding: 20px; text-align: center; }
-    h1 { color: #d9534f; margin-bottom: 10px; }
-    #go-live-btn { background-color: #f0ad4e; color: white; border: none; padding: 10px 20px; font-size: 16px; cursor: pointer; border-radius: 5px; transition: background-color 0.3s; }
-    #go-live-btn:hover { background-color: #ec971f; }
-    #map { height: 500px; width: 100%; border: 2px solid #ccc; border-radius: 5px; margin-top: 20px; }
-    #form { display: none; background-color: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-top: 20px; max-width: 400px; margin-left: auto; margin-right: auto; }
-    #business-form input, #business-form textarea, #business-form select { width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-    #business-form textarea { height: 100px; resize: vertical; }
-    #business-form button { background-color: #d9534f; color: white; border: none; padding: 10px; width: 100%; border-radius: 4px; cursor: pointer; transition: background-color 0.3s; }
-    #business-form button:hover { background-color: #c9302c; }
-    .time-group { display: flex; gap: 10px; }
-    .time-group input { width: 60%; }
-    .time-group select { width: 40%; }
-    #address-preview { font-size: 12px; color: #666; margin-top: 5px; }
-    #business-page { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); max-width: 500px; z-index: 1000; }
-    #business-page img { max-width: 100%; margin: 10px 0; }
-    #close-page { background: #d9534f; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
+    body { 
+      margin: 0; 
+      font-family: 'Roboto', sans-serif; 
+      background-color: #f4f4f9; 
+      color: #333; 
+      line-height: 1.6; 
+    }
+    .container { 
+      max-width: 1280px; 
+      margin: 0 auto; 
+      padding: 40px 20px; 
+    }
+    h1 { 
+      color: #ff5733; 
+      font-size: 2.5em; 
+      margin-bottom: 20px; 
+      text-align: center; 
+    }
+    #go-live-btn { 
+      background-color: #ff5733; 
+      color: white; 
+      border: none; 
+      padding: 12px 24px; 
+      font-size: 1.1em; 
+      cursor: pointer; 
+      border-radius: 8px; 
+      transition: background-color 0.3s, transform 0.2s; 
+      display: block; 
+      margin: 0 auto 30px; 
+    }
+    #go-live-btn:hover { 
+      background-color: #e04e2b; 
+      transform: scale(1.05); 
+    }
+    #map { 
+      height: 600px; 
+      width: 100%; 
+      border-radius: 12px; 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+      margin-bottom: 40px; 
+    }
+    #form { 
+      display: none; 
+      background-color: white; 
+      padding: 30px; 
+      border-radius: 12px; 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+      max-width: 500px; 
+      margin: 0 auto 40px; 
+    }
+    #business-form input, #business-form textarea, #business-form select { 
+      width: 100%; 
+      padding: 10px; 
+      margin: 8px 0; 
+      border: 1px solid #ddd; 
+      border-radius: 6px; 
+      box-sizing: border-box; 
+      font-size: 1em; 
+    }
+    #business-form textarea { 
+      height: 120px; 
+      resize: vertical; 
+    }
+    #business-form button { 
+      background-color: #ff5733; 
+      color: white; 
+      border: none; 
+      padding: 12px; 
+      width: 100%; 
+      border-radius: 6px; 
+      cursor: pointer; 
+      transition: background-color 0.3s; 
+      font-size: 1.1em; 
+    }
+    #business-form button:hover { 
+      background-color: #e04e2b; 
+    }
+    .time-group { 
+      display: flex; 
+      gap: 12px; 
+    }
+    .time-group input { 
+      width: 65%; 
+    }
+    .time-group select { 
+      width: 35%; 
+    }
+    #address-preview { 
+      font-size: 0.9em; 
+      color: #666; 
+      margin-top: 6px; 
+    }
+    #business-page { 
+      display: none; 
+      position: fixed; 
+      top: 50%; 
+      left: 50%; 
+      transform: translate(-50%, -50%); 
+      background: white; 
+      padding: 30px; 
+      border-radius: 12px; 
+      box-shadow: 0 6px 15px rgba(0,0,0,0.2); 
+      max-width: 600px; 
+      z-index: 1000; 
+    }
+    #business-page h2 { 
+      color: #ff5733; 
+      margin-bottom: 15px; 
+    }
+    #business-page p { 
+      margin: 10px 0; 
+    }
+    #business-page img { 
+      max-width: 100%; 
+      border-radius: 8px; 
+      margin: 10px 0; 
+    }
+    #close-page { 
+      background: #ff5733; 
+      color: white; 
+      border: none; 
+      padding: 8px 16px; 
+      border-radius: 6px; 
+      cursor: pointer; 
+      transition: background-color 0.3s; 
+    }
+    #close-page:hover { 
+      background: #e04e2b; 
+    }
+    #about { 
+      background: white; 
+      padding: 40px; 
+      border-radius: 12px; 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+      text-align: left; 
+    }
+    #about h2 { 
+      color: #ff5733; 
+      font-size: 2em; 
+      margin-bottom: 20px; 
+    }
+    #about p { 
+      font-size: 1.1em; 
+      margin-bottom: 15px; 
+    }
   </style>
+  <!-- Add Google Fonts for modern typography -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="container">
@@ -68,12 +197,18 @@
       <div id="page-photos"></div>
       <button id="close-page" onclick="closeBusinessPage()">Close</button>
     </div>
+    <div id="about">
+      <h2>About Streats Live</h2>
+      <p>Our mission is to connect food lovers with the best local food trucks, bringing communities together through delicious eats. We aim to make it easy for vendors to share their locations and for customers to find them in real-time.</p>
+      <p><strong>Goals:</strong> Empower small businesses, promote local cuisine, and create a vibrant food scene in every neighborhood.</p>
+      <p><strong>Team:</strong> A passionate group of foodies, developers, and dreamers working to revolutionize street food discovery.</p>
+    </div>
   </div>
   <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-firestore.js"></script>
   <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-storage.js"></script>
   <!-- Replace YOUR_GOOGLE_API_KEY with your actual key -->
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDeaGTuprL_qbUkydv-DdDYiIgh0_XPu88&libraries=places"></script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_API_KEY&libraries=places"></script>
   <script src="script.js" defer></script>
 </body>
 </html>
