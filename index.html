@@ -5,6 +5,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
+    body { margin: 0; } /* Prevents map from being hidden */
     #map { height: 500px; width: 100%; }
     #form { display: none; margin: 10px; }
   </style>
@@ -23,6 +24,6 @@
   </div>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js"></script>
-  <script src="script.js"></script>
+  <script src="script.js" defer></script> <!-- defer ensures it loads after HTML and other scripts -->
 </body>
 </html>
