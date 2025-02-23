@@ -32,7 +32,6 @@ navigator.geolocation.getCurrentPosition(position => {
     attribution: '© OpenStreetMap'
   }).addTo(map);
 
-  // Custom pin icon
   const foodIcon = L.icon({
     iconUrl: 'https://cdn-icons-png.flaticon.com/512/877/877636.png',
     iconSize: [32, 32],
@@ -40,19 +39,19 @@ navigator.geolocation.getCurrentPosition(position => {
     popupAnchor: [0, -32]
   });
 
-  // Load approved pins with business hours check
   if (db) {
     db.collection('pins').where('status', '==', 'approved').onSnapshot(snapshot => {
       console.log("Fetching approved pins...");
       map.eachLayer(layer => { if (layer instanceof L.Marker) map.removeLayer(layer); });
       snapshot.forEach(doc => {
         const pin = doc.data();
+        console.log("Pin data:", pin); // Debug raw data
         const now = new Date();
-        const currentHours = now.getHours() + now.getMinutes() / 60; // Decimal hours (e.g., 14.5 for 2:30 PM)
+        const currentHours = now.getHours() + now.getMinutes() / 60;
         const startHours = parseInt(pin.startTime.split(':')[0]) + parseInt(pin.startTime.split(':')[1]) / 60;
         const endHours = parseInt(pin.endTime.split(':')[0]) + parseInt(pin.endTime.split(':')[1]) / 60;
+        console.log(`Checking hours: Now=${currentHours}, Start=${startHours}, End=${endHours}`);
 
-        // Show pin if current time is within business hours
         if (currentHours >= startHours && currentHours <= endHours) {
           L.marker([pin.latitude, pin.longitude], { icon: foodIcon })
             .addTo(map)
@@ -65,13 +64,12 @@ navigator.geolocation.getCurrentPosition(position => {
                 <small>Hours: ${pin.startTime} - ${pin.endTime}</small>
               </div>
             `);
+          console.log(`Pin ${pin.name} added to map`);
         } else {
           console.log(`Pin ${pin.name} is outside business hours`);
         }
       });
     });
-  } else {
-    console.log("No Firebase - skipping pin loading");
   }
 }, () => {
   console.log("Geolocation failed, using fallback location");
@@ -91,7 +89,6 @@ function showForm() {
   }
 }
 
-// Geocode address to lat/long
 async function geocodeAddress(address) {
   const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`);
   const data = await response.json();
@@ -119,8 +116,8 @@ if (formElement) {
           address: address,
           latitude: coords.latitude,
           longitude: coords.longitude,
-          startTime: document.getElementById('startTime').value, // e.g., "09:00"
-          endTime: document.getElementById('endTime').value,     // e.g., "17:00"
+          startTime: document.getElementById('startTime').value,
+          endTime: document.getElementById('endTime').value,
           status: 'pending',
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
@@ -132,11 +129,6 @@ if (formElement) {
         console.error("Form submission failed:", error);
         alert("Error: " + error.message);
       }
-    } else {
-      console.error("No Firebase - cannot submit form");
-      alert("Submission failed - Firebase not available");
     }
   };
-} else {
-  console.error("Business form not found");
 }
