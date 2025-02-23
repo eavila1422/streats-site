@@ -52,15 +52,3 @@ navigator.geolocation.getCurrentPosition(position => {
         }
         L.marker([pin.latitude, pin.longitude], { icon: foodIcon })
           .addTo(map)
-          .bindPopup(`<b>${pin.name}</b><br>${pin.description}`);
-        console.log(`Pin ${pin.name} added to map`);
-      });
-    });
-  }
-}, () => {
-  console.log("Geolocation failed, using fallback location");
-  map = L.map('map').setView([51.505, -0.09], 13);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap'
-  }).addTo(map);
-});
