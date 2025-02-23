@@ -1,4 +1,3 @@
-// Your Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyDFRyLHLDumJpteFlannZMcEX3l8VpuQlM",
   authDomain: "streats-site.firebaseapp.com",
@@ -22,7 +21,7 @@ if (typeof firebase !== 'undefined') {
   console.error("Firebase is not defined - skipping initialization");
 }
 
-// Initialize Leaflet map (runs regardless of Firebase)
+// Initialize Leaflet map
 console.log("Attempting to load map...");
 let map;
 navigator.geolocation.getCurrentPosition(position => {
@@ -33,15 +32,38 @@ navigator.geolocation.getCurrentPosition(position => {
     attribution: '© OpenStreetMap'
   }).addTo(map);
 
-  // Load approved pins if Firebase is available
+  // Custom pin icon
+  const foodIcon = L.icon({
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/877/877636.png', // Food icon (fork/knife)
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -32]
+  });
+
+  // Load approved pins with expiration
   if (db) {
     db.collection('pins').where('status', '==', 'approved').onSnapshot(snapshot => {
       console.log("Fetching approved pins...");
+      map.eachLayer(layer => { if (layer instanceof L.Marker) map.removeLayer(layer); });
       snapshot.forEach(doc => {
         const pin = doc.data();
-        L.marker([pin.latitude, pin.longitude])
-          .addTo(map)
-          .bindPopup(`<b>${pin.name}</b><br>${pin.description}`);
+        const createdAt = pin.createdAt.toDate();
+        const now = new Date();
+        const hoursSinceCreation = (now - createdAt) / (1000 * 60 * 60);
+        if (hoursSinceCreation < 24) {
+          L.marker([pin.latitude, pin.longitude], { icon: foodIcon })
+            .addTo(map)
+            .bindPopup(`
+              <div style="font-family: Arial; text-align: center;">
+                <b>${pin.name}</b><br>
+                <i>${pin.foodType}</i><br>
+                ${pin.description}<br>
+                <small>Contact: ${pin.contact}</small>
+              </div>
+            `);
+        } else {
+          console.log(`Pin ${pin.name} expired`);
+        }
       });
     });
   } else {
