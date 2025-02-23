@@ -87,10 +87,14 @@ navigator.geolocation.getCurrentPosition(position => {
 let autocomplete;
 function initializeAutocomplete() {
   const input = document.getElementById('address');
+  if (!input) {
+    console.error("Address input not found");
+    return;
+  }
   autocomplete = new google.maps.places.Autocomplete(input, {
     types: ['address'],
-    componentRestrictions: { country: 'us' }, // Restrict to US addresses
-    fields: ['formatted_address', 'geometry.location'] // Get address and coordinates
+    componentRestrictions: { country: 'us' },
+    fields: ['formatted_address', 'geometry.location']
   });
   autocomplete.addListener('place_changed', () => {
     const place = autocomplete.getPlace();
@@ -98,6 +102,9 @@ function initializeAutocomplete() {
       const preview = document.getElementById('address-preview');
       preview.textContent = `Selected: ${place.formatted_address}`;
       preview.style.color = '#28a745';
+      console.log("Address selected:", place.formatted_address, "Coords:", place.geometry.location.lat(), place.geometry.location.lng());
+    } else {
+      console.log("No geometry for selected place");
     }
   });
 }
