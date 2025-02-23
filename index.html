@@ -5,78 +5,20 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    body {
-      margin: 0;
-      font-family: 'Arial', sans-serif;
-      background-color: #f9e9d8;
-      color: #333;
-    }
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 20px;
-      text-align: center;
-    }
-    h1 {
-      color: #d9534f;
-      margin-bottom: 10px;
-    }
-    #go-live-btn {
-      background-color: #f0ad4e;
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      font-size: 16px;
-      cursor: pointer;
-      border-radius: 5px;
-      transition: background-color 0.3s;
-    }
-    #go-live-btn:hover {
-      background-color: #ec971f;
-    }
-    #map {
-      height: 500px;
-      width: 100%;
-      border: 2px solid #ccc;
-      border-radius: 5px;
-      margin-top: 20px;
-    }
-    #form {
-      display: none;
-      background-color: white;
-      padding: 20px;
-      border-radius: 5px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-      margin-top: 20px;
-      max-width: 400px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-    #business-form input, #business-form textarea {
-      width: 100%;
-      padding: 8px;
-      margin: 5px 0;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      box-sizing: border-box;
-    }
-    #business-form textarea {
-      height: 100px;
-      resize: vertical;
-    }
-    #business-form button {
-      background-color: #d9534f;
-      color: white;
-      border: none;
-      padding: 10px;
-      width: 100%;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: background-color 0.3s;
-    }
-    #business-form button:hover {
-      background-color: #c9302c;
-    }
+    body { margin: 0; font-family: 'Arial', sans-serif; background-color: #f9e9d8; color: #333; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; text-align: center; }
+    h1 { color: #d9534f; margin-bottom: 10px; }
+    #go-live-btn { background-color: #f0ad4e; color: white; border: none; padding: 10px 20px; font-size: 16px; cursor: pointer; border-radius: 5px; transition: background-color 0.3s; }
+    #go-live-btn:hover { background-color: #ec971f; }
+    #map { height: 500px; width: 100%; border: 2px solid #ccc; border-radius: 5px; margin-top: 20px; }
+    #form { display: none; background-color: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-top: 20px; max-width: 400px; margin-left: auto; margin-right: auto; }
+    #business-form input, #business-form textarea, #business-form select { width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    #business-form textarea { height: 100px; resize: vertical; }
+    #business-form button { background-color: #d9534f; color: white; border: none; padding: 10px; width: 100%; border-radius: 4px; cursor: pointer; transition: background-color 0.3s; }
+    #business-form button:hover { background-color: #c9302c; }
+    .time-group { display: flex; gap: 10px; }
+    .time-group input { width: 60%; }
+    .time-group select { width: 40%; }
   </style>
 </head>
 <body>
@@ -90,8 +32,20 @@
         <input type="text" id="foodType" placeholder="Food Type (e.g., Tacos)" required><br>
         <input type="text" id="contact" placeholder="Contact Info" required><br>
         <input type="text" id="address" placeholder="Address (e.g., 123 Main St, City)" required><br>
-        <input type="time" id="startTime" placeholder="Start Time" required><br>
-        <input type="time" id="endTime" placeholder="End Time" required><br>
+        <div class="time-group">
+          <input type="text" id="startTime" placeholder="Start (e.g., 9:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$" required>
+          <select id="startPeriod" required>
+            <option value="AM">AM</option>
+            <option value="PM">PM</option>
+          </select>
+        </div>
+        <div class="time-group">
+          <input type="text" id="endTime" placeholder="End (e.g., 5:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$" required>
+          <select id="endPeriod" required>
+            <option value="AM">AM</option>
+            <option value="PM">PM</option>
+          </select>
+        </div>
         <textarea id="description" placeholder="Description" required></textarea><br>
         <button type="submit">Submit</button>
       </form>
