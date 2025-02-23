@@ -1,3 +1,4 @@
+// Your Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyDFRyLHLDumJpteFlannZMcEX3l8VpuQlM",
   authDomain: "streats-site.firebaseapp.com",
@@ -8,15 +9,20 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-try {
-  firebase.initializeApp(firebaseConfig);
-  console.log("Firebase initialized successfully");
-} catch (error) {
-  console.error("Firebase initialization failed:", error);
+let db;
+if (typeof firebase !== 'undefined') {
+  try {
+    firebase.initializeApp(firebaseConfig);
+    console.log("Firebase initialized successfully");
+    db = firebase.firestore();
+  } catch (error) {
+    console.error("Firebase initialization failed:", error);
+  }
+} else {
+  console.error("Firebase is not defined - skipping initialization");
 }
-const db = firebase.firestore();
 
-// Initialize Leaflet map
+// Initialize Leaflet map (runs regardless of Firebase)
 console.log("Attempting to load map...");
 let map;
 navigator.geolocation.getCurrentPosition(position => {
@@ -27,16 +33,20 @@ navigator.geolocation.getCurrentPosition(position => {
     attribution: '© OpenStreetMap'
   }).addTo(map);
 
-  // Load approved pins
-  db.collection('pins').where('status', '==', 'approved').onSnapshot(snapshot => {
-    console.log("Fetching approved pins...");
-    snapshot.forEach(doc => {
-      const pin = doc.data();
-      L.marker([pin.latitude, pin.longitude])
-        .addTo(map)
-        .bindPopup(`<b>${pin.name}</b><br>${pin.description}`);
+  // Load approved pins if Firebase is available
+  if (db) {
+    db.collection('pins').where('status', '==', 'approved').onSnapshot(snapshot => {
+      console.log("Fetching approved pins...");
+      snapshot.forEach(doc => {
+        const pin = doc.data();
+        L.marker([pin.latitude, pin.longitude])
+          .addTo(map)
+          .bindPopup(`<b>${pin.name}</b><br>${pin.description}`);
+      });
     });
-  });
+  } else {
+    console.log("No Firebase - skipping pin loading");
+  }
 }, () => {
   console.log("Geolocation failed, using fallback location");
   map = L.map('map').setView([51.505, -0.09], 13);
@@ -60,23 +70,28 @@ if (formElement) {
   formElement.onsubmit = async (e) => {
     e.preventDefault();
     console.log("Form submitted");
-    try {
-      const data = {
-        name: document.getElementById('name').value,
-        foodType: document.getElementById('foodType').value,
-        contact: document.getElementById('contact').value,
-        description: document.getElementById('description').value,
-        latitude: map.getCenter().lat,
-        longitude: map.getCenter().lng,
-        status: 'pending',
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      };
-      await db.collection('pins').add(data);
-      alert('Submitted for approval!');
-      document.getElementById('form').style.display = 'none';
-      e.target.reset();
-    } catch (error) {
-      console.error("Form submission failed:", error);
+    if (db) {
+      try {
+        const data = {
+          name: document.getElementById('name').value,
+          foodType: document.getElementById('foodType').value,
+          contact: document.getElementById('contact').value,
+          description: document.getElementById('description').value,
+          latitude: map.getCenter().lat,
+          longitude: map.getCenter().lng,
+          status: 'pending',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        await db.collection('pins').add(data);
+        alert('Submitted for approval!');
+        document.getElementById('form').style.display = 'none';
+        e.target.reset();
+      } catch (error) {
+        console.error("Form submission failed:", error);
+      }
+    } else {
+      console.error("No Firebase - cannot submit form");
+      alert("Submission failed - Firebase not available");
     }
   };
 } else {
