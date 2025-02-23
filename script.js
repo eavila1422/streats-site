@@ -45,11 +45,18 @@ navigator.geolocation.getCurrentPosition(position => {
       map.eachLayer(layer => { if (layer instanceof L.Marker) map.removeLayer(layer); });
       snapshot.forEach(doc => {
         const pin = doc.data();
-        console.log("Pin data:", pin); // Debug raw data
+        console.log("Pin data:", pin);
         const now = new Date();
-        const currentHours = now.getHours() + now.getMinutes() / 60;
-        const startHours = parseInt(pin.startTime.split(':')[0]) + parseInt(pin.startTime.split(':')[1]) / 60;
-        const endHours = parseInt(pin.endTime.split(':')[0]) + parseInt(pin.endTime.split(':')[1]) / 60;
+        let currentHours = now.getHours() + now.getMinutes() / 60;
+        let startHours = parseInt(pin.startTime.split(':')[0]) + parseInt(pin.startTime.split(':')[1]) / 60;
+        let endHours = parseInt(pin.endTime.split(':')[0]) + parseInt(pin.endTime.split(':')[1]) / 60;
+
+        // Adjust for AM/PM
+        if (pin.startPeriod === 'PM' && startHours < 12) startHours += 12;
+        if (pin.startPeriod === 'AM' && startHours === 12) startHours = 0;
+        if (pin.endPeriod === 'PM' && endHours < 12) endHours += 12;
+        if (pin.endPeriod === 'AM' && endHours === 12) endHours = 0;
+
         console.log(`Checking hours: Now=${currentHours}, Start=${startHours}, End=${endHours}`);
 
         if (currentHours >= startHours && currentHours <= endHours) {
@@ -61,7 +68,7 @@ navigator.geolocation.getCurrentPosition(position => {
                 <i>${pin.foodType}</i><br>
                 ${pin.description}<br>
                 <small>Contact: ${pin.contact}</small><br>
-                <small>Hours: ${pin.startTime} - ${pin.endTime}</small>
+                <small>Hours: ${pin.startTime} ${pin.startPeriod} - ${pin.endTime} ${pin.endPeriod}</small>
               </div>
             `);
           console.log(`Pin ${pin.name} added to map`);
@@ -82,11 +89,7 @@ navigator.geolocation.getCurrentPosition(position => {
 function showForm() {
   console.log("Go Live button clicked");
   const form = document.getElementById('form');
-  if (form) {
-    form.style.display = 'block';
-  } else {
-    console.error("Form element not found");
-  }
+  if (form) form.style.display = 'block';
 }
 
 async function geocodeAddress(address) {
@@ -117,7 +120,9 @@ if (formElement) {
           latitude: coords.latitude,
           longitude: coords.longitude,
           startTime: document.getElementById('startTime').value,
+          startPeriod: document.getElementById('startPeriod').value,
           endTime: document.getElementById('endTime').value,
+          endPeriod: document.getElementById('endPeriod').value,
           status: 'pending',
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
