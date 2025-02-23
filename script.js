@@ -5,8 +5,8 @@ const firebaseConfig = {
   storageBucket: "streats-site.firebasestorage.app",
   messagingSenderId: "435856449927",
   appId: "1:435856449927:web:021d6dae14a84320627322",
-  measurementId: "G-S7M1VMZCFR"
 };
+
 // Initialize Firebase
 try {
   firebase.initializeApp(firebaseConfig);
@@ -39,7 +39,7 @@ navigator.geolocation.getCurrentPosition(position => {
   });
 }, () => {
   console.log("Geolocation failed, using fallback location");
-  map = L.map('map').setView([51.505, -0.09], 13); // Default: London
+  map = L.map('map').setView([51.505, -0-09], 13); // Default: London
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
   }).addTo(map);
