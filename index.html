@@ -8,7 +8,7 @@
     body {
       margin: 0;
       font-family: 'Arial', sans-serif;
-      background-color: #f9e9d8; /* Warm beige */
+      background-color: #f9e9d8;
       color: #333;
     }
     .container {
@@ -18,11 +18,11 @@
       text-align: center;
     }
     h1 {
-      color: #d9534f; /* Warm red */
+      color: #d9534f;
       margin-bottom: 10px;
     }
     #go-live-btn {
-      background-color: #f0ad4e; /* Warm yellow */
+      background-color: #f0ad4e;
       color: white;
       border: none;
       padding: 10px 20px;
@@ -32,7 +32,7 @@
       transition: background-color 0.3s;
     }
     #go-live-btn:hover {
-      background-color: #ec971f; /* Darker yellow */
+      background-color: #ec971f;
     }
     #map {
       height: 500px;
@@ -89,6 +89,9 @@
         <input type="text" id="name" placeholder="Business Name" required><br>
         <input type="text" id="foodType" placeholder="Food Type (e.g., Tacos)" required><br>
         <input type="text" id="contact" placeholder="Contact Info" required><br>
+        <input type="text" id="address" placeholder="Address (e.g., 123 Main St, City)" required><br>
+        <input type="time" id="startTime" placeholder="Start Time" required><br>
+        <input type="time" id="endTime" placeholder="End Time" required><br>
         <textarea id="description" placeholder="Description" required></textarea><br>
         <button type="submit">Submit</button>
       </form>
