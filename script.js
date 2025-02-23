@@ -8,17 +8,16 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-let db;
+let db, storage;
 if (typeof firebase !== 'undefined') {
   try {
     firebase.initializeApp(firebaseConfig);
     console.log("Firebase initialized successfully");
     db = firebase.firestore();
+    storage = firebase.storage();
   } catch (error) {
     console.error("Firebase initialization failed:", error);
   }
-} else {
-  console.error("Firebase is not defined - skipping initialization");
 }
 
 // Initialize Leaflet map
@@ -51,7 +50,6 @@ navigator.geolocation.getCurrentPosition(position => {
         let startHours = parseInt(pin.startTime.split(':')[0]) + parseInt(pin.startTime.split(':')[1]) / 60;
         let endHours = parseInt(pin.endTime.split(':')[0]) + parseInt(pin.endTime.split(':')[1]) / 60;
 
-        // Adjust for AM/PM
         if (pin.startPeriod === 'PM' && startHours < 12) startHours += 12;
         if (pin.startPeriod === 'AM' && startHours === 12) startHours = 0;
         if (pin.endPeriod === 'PM' && endHours < 12) endHours += 12;
@@ -60,7 +58,7 @@ navigator.geolocation.getCurrentPosition(position => {
         console.log(`Checking hours: Now=${currentHours}, Start=${startHours}, End=${endHours}`);
 
         if (currentHours >= startHours && currentHours <= endHours) {
-          L.marker([pin.latitude, pin.longitude], { icon: foodIcon })
+          const marker = L.marker([pin.latitude, pin.longitude], { icon: foodIcon })
             .addTo(map)
             .bindPopup(`
               <div style="font-family: Arial; text-align: center;">
@@ -71,6 +69,7 @@ navigator.geolocation.getCurrentPosition(position => {
                 <small>Hours: ${pin.startTime} ${pin.startPeriod} - ${pin.endTime} ${pin.endPeriod}</small>
               </div>
             `);
+          marker.on('click', () => showBusinessPage(pin));
           console.log(`Pin ${pin.name} added to map`);
         } else {
           console.log(`Pin ${pin.name} is outside business hours`);
@@ -88,8 +87,7 @@ navigator.geolocation.getCurrentPosition(position => {
 
 function showForm() {
   console.log("Go Live button clicked");
-  const form = document.getElementById('form');
-  if (form) form.style.display = 'block';
+  document.getElementById('form').style.display = 'block';
 }
 
 async function geocodeAddress(address) {
@@ -102,12 +100,23 @@ async function geocodeAddress(address) {
   }
 }
 
+async function uploadPhotos(files, pinId) {
+  const photoUrls = [];
+  for (const file of files) {
+    const ref = storage.ref().child(`pins/${pinId}/${file.name}`);
+    await ref.put(file);
+    const url = await ref.getDownloadURL();
+    photoUrls.push(url);
+  }
+  return photoUrls;
+}
+
 const formElement = document.getElementById('business-form');
 if (formElement) {
   formElement.onsubmit = async (e) => {
     e.preventDefault();
     console.log("Form submitted");
-    if (db) {
+    if (db && storage) {
       try {
         const address = document.getElementById('address').value;
         const coords = await geocodeAddress(address);
@@ -123,10 +132,16 @@ if (formElement) {
           startPeriod: document.getElementById('startPeriod').value,
           endTime: document.getElementById('endTime').value,
           endPeriod: document.getElementById('endPeriod').value,
+          specials: document.getElementById('specials').value,
           status: 'pending',
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
-        await db.collection('pins').add(data);
+        const docRef = await db.collection('pins').add(data);
+        const photos = document.getElementById('photos').files;
+        if (photos.length > 0) {
+          const photoUrls = await uploadPhotos(photos, docRef.id);
+          await docRef.update({ photos: photoUrls });
+        }
         alert('Submitted for approval!');
         document.getElementById('form').style.display = 'none';
         e.target.reset();
@@ -136,4 +151,28 @@ if (formElement) {
       }
     }
   };
+}
+
+function showBusinessPage(pin) {
+  document.getElementById('page-name').textContent = pin.name;
+  document.getElementById('page-foodType').textContent = `Food Type: ${pin.foodType}`;
+  document.getElementById('page-contact').textContent = `Contact: ${pin.contact}`;
+  document.getElementById('page-address').textContent = `Address: ${pin.address}`;
+  document.getElementById('page-hours').textContent = `Hours: ${pin.startTime} ${pin.startPeriod} - ${pin.endTime} ${pin.endPeriod}`;
+  document.getElementById('page-description').textContent = `Description: ${pin.description}`;
+  document.getElementById('page-specials').textContent = `Specials: ${pin.specials}`;
+  const photosDiv = document.getElementById('page-photos');
+  photosDiv.innerHTML = '';
+  if (pin.photos && pin.photos.length > 0) {
+    pin.photos.forEach(url => {
+      const img = document.createElement('img');
+      img.src = url;
+      photosDiv.appendChild(img);
+    });
+  }
+  document.getElementById('business-page').style.display = 'block';
+}
+
+function closeBusinessPage() {
+  document.getElementById('business-page').style.display = 'none';
 }
