@@ -9,6 +9,9 @@ const firebaseConfig = {
   appId: "1:435856449927:web:021d6dae14a84320627322",
 };
 
+// Replace with your Mapbox token
+const MAPBOX_TOKEN = 'pk.eyJ1IjoiZWF2aWxhMTQyMiIsImEiOiJjbTdpMjZsYngwY2IxMm1vaWtjM3ZieGRmIn0.C9ja6tcQ-iNu91gSDggyxg';
+
 // Initialize Firebase
 let db, storage;
 if (typeof firebase !== 'undefined') {
@@ -22,22 +25,24 @@ if (typeof firebase !== 'undefined') {
   }
 }
 
-// Initialize Leaflet map
+// Initialize Leaflet map with Mapbox
 console.log("Attempting to load map...");
 let map;
 navigator.geolocation.getCurrentPosition(position => {
   const { latitude, longitude } = position.coords;
   console.log("Geolocation success:", latitude, longitude);
   map = L.map('map').setView([latitude, longitude], 13);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap'
+  L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/{z}/{x}/{y}?access_token=' + MAPBOX_TOKEN, {
+    attribution: '© <a href="https://www.mapbox.com/">Mapbox</a> © <a href="https://www.openstreetmap.org/">OpenStreetMap</a>',
+    tileSize: 512,
+    zoomOffset: -1
   }).addTo(map);
 
-  const foodIcon = L.icon({
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/877/877636.png',
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -32]
+  const foodTruckIcon = L.icon({
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/1048/1048313.png', // Food truck icon
+    iconSize: [38, 38],
+    iconAnchor: [19, 38],
+    popupAnchor: [0, -38]
   });
 
   if (db) {
@@ -61,10 +66,10 @@ navigator.geolocation.getCurrentPosition(position => {
         if (pin.endPeriod === 'PM' && endHours < 12) endHours += 12;
         if (pin.endPeriod === 'AM' && endHours === 12) endHours = 0;
 
-        console.log(`Checking hours: Now=${currentHours}, Start=${startHours}, End=${endHours}`);
+        console.log(`Checking hours for ${pin.name}: Now=${currentHours}, Start=${startHours}, End=${endHours}`);
 
         if (currentHours >= startHours && currentHours <= endHours) {
-          const marker = L.marker([pin.latitude, pin.longitude], { icon: foodIcon })
+          const marker = L.marker([pin.latitude, pin.longitude], { icon: foodTruckIcon })
             .addTo(map)
             .bindPopup(`<b>${pin.name}</b><br>${pin.description}`);
           marker.on('click', () => showBusinessPage(pin));
@@ -78,8 +83,10 @@ navigator.geolocation.getCurrentPosition(position => {
 }, () => {
   console.log("Geolocation failed, using fallback location");
   map = L.map('map').setView([51.505, -0.09], 13);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap'
+  L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/{z}/{x}/{y}?access_token=' + MAPBOX_TOKEN, {
+    attribution: '© <a href="https://www.mapbox.com/">Mapbox</a> © <a href="https://www.openstreetmap.org/">OpenStreetMap</a>',
+    tileSize: 512,
+    zoomOffset: -1
   }).addTo(map);
 });
 
