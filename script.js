@@ -1,3 +1,5 @@
+console.log("Script.js loaded at:", new Date().toLocaleString());
+
 const firebaseConfig = {
   apiKey: "AIzaSyDFRyLHLDumJpteFlannZMcEX3l8VpuQlM",
   authDomain: "streats-site.firebaseapp.com",
@@ -8,12 +10,13 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-let db;
+let db, storage;
 if (typeof firebase !== 'undefined') {
   try {
     firebase.initializeApp(firebaseConfig);
     console.log("Firebase initialized successfully");
     db = firebase.firestore();
+    storage = firebase.storage();
   } catch (error) {
     console.error("Firebase initialization failed:", error);
   }
@@ -44,13 +47,28 @@ navigator.geolocation.getCurrentPosition(position => {
       snapshot.forEach(doc => {
         const pin = doc.data();
         console.log("Pin data:", pin);
-        if (!pin.latitude || !pin.longitude) {
-          console.log(`Pin ${pin.name || 'unknown'} skipped - missing coordinates`);
+        if (!pin.latitude || !pin.longitude || !pin.startTime || !pin.endTime) {
+          console.log(`Pin ${pin.name || 'unknown'} skipped - missing required fields`);
           return;
         }
-        L.marker([pin.latitude, pin.longitude], { icon: foodIcon })
-          .addTo(map)
-          .bindPopup(`<b>${pin.name}</b><br>${pin.description}`);
+        const now = new Date();
+        let currentHours = now.getHours() + now.getMinutes() / 60;
+        let startHours = parseInt(pin.startTime.split(':')[0]) + parseInt(pin.startTime.split(':')[1]) / 60;
+        let endHours = parseInt(pin.endTime.split(':')[0]) + parseInt(pin.endTime.split(':')[1]) / 60;
+
+        if (pin.startPeriod === 'PM' && startHours < 12) startHours += 12;
+        if (pin.startPeriod === 'AM' && startHours === 12) startHours = 0;
+        if (pin.endPeriod === 'PM' && endHours < 12) endHours += 12;
+        if (pin.endPeriod === 'AM' && endHours === 12) endHours = 0;
+
+        if (currentHours >= startHours && currentHours <= endHours) {
+          const marker = L.marker([pin.latitude, pin.longitude], { icon: foodIcon })
+            .addTo(map)
+            .bindPopup(`<b>${pin.name}</b><br>${pin.description}`);
+          console.log(`Pin ${pin.name} added to map`);
+        } else {
+          console.log(`Pin ${pin.name} outside business hours`);
+        }
       });
     });
   }
@@ -61,3 +79,9 @@ navigator.geolocation.getCurrentPosition(position => {
     attribution: '© OpenStreetMap'
   }).addTo(map);
 });
+
+function showForm() {
+  console.log("Go Live button clicked");
+  const form = document.getElementById('form');
+  if (form) form.style.display = 'block';
+}
