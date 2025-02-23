@@ -35,7 +35,7 @@
         <input type="text" id="name" placeholder="Business Name" required><br>
         <input type="text" id="foodType" placeholder="Food Type (e.g., Tacos)" required><br>
         <input type="text" id="contact" placeholder="Contact Info" required><br>
-        <input type="text" id="address" placeholder="Address (e.g., 123 Main St, City)" required onblur="verifyAddress()"><br>
+        <input type="text" id="address" placeholder="Start typing address..." required><br>
         <div id="address-preview"></div>
         <div class="time-group">
           <input type="text" id="startTime" placeholder="Start (e.g., 9:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$" required>
@@ -72,6 +72,8 @@
   <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-firestore.js"></script>
   <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-storage.js"></script>
+  <!-- Replace YOUR_GOOGLE_API_KEY with your actual key -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDeaGTuprL_qbUkydv-DdDYiIgh0_XPu88&libraries=places"></script>
   <script src="script.js" defer></script>
 </body>
 </html>
