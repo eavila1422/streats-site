@@ -5,8 +5,8 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    body { margin: 0; } /* Prevents map from being hidden */
-    #map { height: 500px; width: 100%; }
+    body { margin: 0; }
+    #map { height: 500px; width: 100%; border: 1px solid #ccc; }
     #form { display: none; margin: 10px; }
   </style>
 </head>
@@ -22,8 +22,9 @@
       <button type="submit">Submit</button>
     </form>
   </div>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js"></script>
-  <script src="script.js" defer></script> <!-- defer ensures it loads after HTML and other scripts -->
+  <!-- Use Firebase compat scripts to avoid module issues -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore-compat.js"></script>
+  <script src="script.js" defer></script>
 </body>
 </html>
