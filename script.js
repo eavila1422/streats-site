@@ -83,6 +83,28 @@ navigator.geolocation.getCurrentPosition(position => {
   }).addTo(map);
 });
 
+// Autocomplete setup
+let autocomplete;
+function initializeAutocomplete() {
+  const input = document.getElementById('address');
+  autocomplete = new google.maps.places.Autocomplete(input, {
+    types: ['address'],
+    componentRestrictions: { country: 'us' }, // Restrict to US addresses
+    fields: ['formatted_address', 'geometry.location'] // Get address and coordinates
+  });
+  autocomplete.addListener('place_changed', () => {
+    const place = autocomplete.getPlace();
+    if (place.geometry) {
+      const preview = document.getElementById('address-preview');
+      preview.textContent = `Selected: ${place.formatted_address}`;
+      preview.style.color = '#28a745';
+    }
+  });
+}
+
+// Call this when script loads
+initializeAutocomplete();
+
 function showForm() {
   console.log("Go Live button clicked");
   const form = document.getElementById('form');
@@ -93,60 +115,6 @@ function showForm() {
   }
 }
 
-async function geocodeAddress(address) {
-  try {
-    // Try with broader search first, no strict bounding box
-    let url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=us`;
-    let response = await fetch(url);
-    let data = await response.json();
-    console.log("Geocoding attempt 1 for:", address, "Raw data:", data);
-    if (data && data.length > 0) {
-      const result = {
-        latitude: parseFloat(data[0].lat),
-        longitude: parseFloat(data[0].lon),
-        displayName: data[0].display_name
-      };
-      console.log("Geocoded result (attempt 1):", result);
-      return result;
-    }
-    // Fallback: retry without countrycodes if needed
-    url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`;
-    response = await fetch(url);
-    data = await response.json();
-    console.log("Geocoding attempt 2 for:", address, "Raw data:", data);
-    if (data && data.length > 0) {
-      const result = {
-        latitude: parseFloat(data[0].lat),
-        longitude: parseFloat(data[0].lon),
-        displayName: data[0].display_name
-      };
-      console.log("Geocoded result (attempt 2):", result);
-      return result;
-    }
-    throw new Error("Address not found after two attempts");
-  } catch (error) {
-    console.error("Geocoding failed:", error);
-    throw error;
-  }
-}
-
-async function verifyAddress() {
-  const address = document.getElementById('address').value;
-  const preview = document.getElementById('address-preview');
-  if (!address) {
-    preview.textContent = "Please enter an address";
-    return;
-  }
-  try {
-    const result = await geocodeAddress(address);
-    preview.textContent = `Found: ${result.displayName}`;
-    preview.style.color = '#28a745';
-  } catch (error) {
-    preview.textContent = "Invalid address - please check and try again";
-    preview.style.color = '#d9534f';
-  }
-}
-
 const formElement = document.getElementById('business-form');
 if (formElement) {
   formElement.onsubmit = async (e) => {
@@ -154,10 +122,16 @@ if (formElement) {
     console.log("Form submitted");
     if (db && storage) {
       try {
-        const address = document.getElementById('address').value;
-        console.log("Submitting address:", address);
-        const coords = await geocodeAddress(address);
-        console.log("Geocoded coords:", coords);
+        const place = autocomplete.getPlace();
+        if (!place || !place.geometry) {
+          throw new Error("Please select an address from the dropdown");
+        }
+        const address = place.formatted_address;
+        const coords = {
+          latitude: place.geometry.location.lat(),
+          longitude: place.geometry.location.lng()
+        };
+        console.log("Selected address:", address, "Coords:", coords);
         const data = {
           name: document.getElementById('name').value,
           foodType: document.getElementById('foodType').value,
