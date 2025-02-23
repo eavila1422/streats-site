@@ -10,12 +10,13 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-let db;
+let db, storage;
 if (typeof firebase !== 'undefined') {
   try {
     firebase.initializeApp(firebaseConfig);
     console.log("Firebase initialized successfully");
     db = firebase.firestore();
+    storage = firebase.storage();
   } catch (error) {
     console.error("Firebase initialization failed:", error);
   }
@@ -73,4 +74,58 @@ function showForm() {
   } else {
     console.error("Form element not found");
   }
+}
+
+async function geocodeAddress(address) {
+  try {
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`);
+    const data = await response.json();
+    if (data && data.length > 0) {
+      return { latitude: parseFloat(data[0].lat), longitude: parseFloat(data[0].lon) };
+    } else {
+      throw new Error("Address not found");
+    }
+  } catch (error) {
+    console.error("Geocoding failed:", error);
+    throw error;
+  }
+}
+
+const formElement = document.getElementById('business-form');
+if (formElement) {
+  formElement.onsubmit = async (e) => {
+    e.preventDefault();
+    console.log("Form submitted");
+    if (db) {
+      try {
+        const address = document.getElementById('address').value;
+        console.log("Submitting address:", address);
+        const coords = await geocodeAddress(address);
+        console.log("Geocoded coords:", coords);
+        const data = {
+          name: document.getElementById('name').value,
+          foodType: document.getElementById('foodType').value,
+          contact: document.getElementById('contact').value,
+          description: document.getElementById('description').value,
+          address: address,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          status: 'pending',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        console.log("Data to save:", data);
+        await db.collection('pins').add(data);
+        console.log("Data saved to Firebase");
+        alert('Submitted for approval!');
+        document.getElementById('form').style.display = 'none';
+        e.target.reset();
+      } catch (error) {
+        console.error("Form submission failed:", error);
+        alert("Error: " + error.message);
+      }
+    } else {
+      console.error("Firebase not initialized");
+      alert("Firebase not available");
+    }
+  };
 }
