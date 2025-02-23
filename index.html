@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Food Map Live</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    #map { height: 500px; width: 100%; }
+    #form { display: none; margin: 10px; }
+  </style>
+</head>
+<body>
+  <button onclick="showForm()">Go Live</button>
+  <div id="map"></div>
+  <div id="form">
+    <form id="business-form">
+      <input type="text" id="name" placeholder="Business Name" required><br>
+      <input type="text" id="foodType" placeholder="Food Type" required><br>
+      <input type="text" id="contact" placeholder="Contact Info" required><br>
+      <textarea id="description" placeholder="Description" required></textarea><br>
+      <button type="submit">Submit</button>
+    </form>
+  </div>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
