@@ -1,33 +1,101 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Food Map Live</title>
+  <title>Streats Live</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    body { margin: 0; }
-    #map { height: 500px; width: 100%; border: 1px solid #ccc; }
-    #form { display: none; margin: 10px; }
+    body {
+      margin: 0;
+      font-family: 'Arial', sans-serif;
+      background-color: #f9e9d8; /* Warm beige */
+      color: #333;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      text-align: center;
+    }
+    h1 {
+      color: #d9534f; /* Warm red */
+      margin-bottom: 10px;
+    }
+    #go-live-btn {
+      background-color: #f0ad4e; /* Warm yellow */
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 5px;
+      transition: background-color 0.3s;
+    }
+    #go-live-btn:hover {
+      background-color: #ec971f; /* Darker yellow */
+    }
+    #map {
+      height: 500px;
+      width: 100%;
+      border: 2px solid #ccc;
+      border-radius: 5px;
+      margin-top: 20px;
+    }
+    #form {
+      display: none;
+      background-color: white;
+      padding: 20px;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      margin-top: 20px;
+      max-width: 400px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    #business-form input, #business-form textarea {
+      width: 100%;
+      padding: 8px;
+      margin: 5px 0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    #business-form textarea {
+      height: 100px;
+      resize: vertical;
+    }
+    #business-form button {
+      background-color: #d9534f;
+      color: white;
+      border: none;
+      padding: 10px;
+      width: 100%;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    #business-form button:hover {
+      background-color: #c9302c;
+    }
   </style>
 </head>
 <body>
-  <button onclick="showForm()">Go Live</button>
-  <div id="map"></div>
-  <div id="form">
-    <form id="business-form">
-      <input type="text" id="name" placeholder="Business Name" required><br>
-      <input type="text" id="foodType" placeholder="Food Type" required><br>
-      <input type="text" id="contact" placeholder="Contact Info" required><br>
-      <textarea id="description" placeholder="Description" required></textarea><br>
-      <button type="submit">Submit</button>
-    </form>
+  <div class="container">
+    <h1>Streats Live</h1>
+    <button id="go-live-btn" onclick="showForm()">Go Live</button>
+    <div id="map"></div>
+    <div id="form">
+      <form id="business-form">
+        <input type="text" id="name" placeholder="Business Name" required><br>
+        <input type="text" id="foodType" placeholder="Food Type (e.g., Tacos)" required><br>
+        <input type="text" id="contact" placeholder="Contact Info" required><br>
+        <textarea id="description" placeholder="Description" required></textarea><br>
+        <button type="submit">Submit</button>
+      </form>
+    </div>
   </div>
   <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-firestore.js"></script>
-  <script>
-    // Debug Firebase loading
-    console.log("Firebase scripts loaded:", typeof firebase !== 'undefined' ? "Yes" : "No");
-  </script>
   <script src="script.js" defer></script>
 </body>
 </html>
