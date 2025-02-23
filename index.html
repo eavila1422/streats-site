@@ -22,9 +22,12 @@
       <button type="submit">Submit</button>
     </form>
   </div>
-  <!-- Use Firebase v7.24.0 for reliable global loading -->
   <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-firestore.js"></script>
+  <script>
+    // Debug Firebase loading
+    console.log("Firebase scripts loaded:", typeof firebase !== 'undefined' ? "Yes" : "No");
+  </script>
   <script src="script.js" defer></script>
 </body>
 </html>
