@@ -246,7 +246,7 @@ auth.onAuthStateChanged(async user => {
     if (userDoc.exists) {
       const userData = userDoc.data();
       document.getElementById('sidebar-name').textContent = userData.name;
-      document.getElementById('sidebar-status').textContent = userData.approved ? "Approved" : "Pending Approval";
+      document.getElementById('sidebar-status').textContent = userData.approved ? "Approved" : "Pending";
       const pinDoc = await db.collection('pins').doc(user.uid).get();
       const isLive = pinDoc.exists && pinDoc.data().live;
       liveToggle.textContent = isLive ? "Go Offline" : "Go Live";
@@ -397,6 +397,7 @@ async function uploadPhotos(files, pinId) {
       console.log("Successfully uploaded photo:", url);
     } catch (error) {
       console.error("Failed to upload photo:", file.name, error);
+      throw error; // Propagate error for further handling
     }
   }
   return photoUrls;
