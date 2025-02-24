@@ -31,7 +31,7 @@ navigator.geolocation.getCurrentPosition(position => {
   const { latitude, longitude } = position.coords;
   console.log("Geolocation success:", latitude, longitude);
   map = L.map('map').setView([latitude, longitude], 13);
-  L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/{z}/{x}/{y}?access_token=' + MAPBOX_TOKEN, {
+  L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/dark-v10/tiles/{z}/{x}/{y}?access_token=' + MAPBOX_TOKEN, {
     attribution: '© <a href="https://www.mapbox.com/">Mapbox</a> © <a href="https://www.openstreetmap.org/">OpenStreetMap</a>',
     tileSize: 512,
     zoomOffset: -1
@@ -82,7 +82,7 @@ navigator.geolocation.getCurrentPosition(position => {
 }, () => {
   console.log("Geolocation failed, using fallback location");
   map = L.map('map').setView([51.505, -0.09], 13);
-  L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/{z}/{x}/{y}?access_token=' + MAPBOX_TOKEN, {
+  L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/dark-v10/tiles/{z}/{x}/{y}?access_token=' + MAPBOX_TOKEN, {
     attribution: '© <a href="https://www.mapbox.com/">Mapbox</a> © <a href="https://www.openstreetmap.org/">OpenStreetMap</a>',
     tileSize: 512,
     zoomOffset: -1
@@ -98,6 +98,7 @@ const authSubmit = document.getElementById('auth-submit');
 const authToggle = document.getElementById('auth-toggle');
 const vendorDashboard = document.getElementById('vendor-dashboard');
 const liveToggle = document.getElementById('live-toggle');
+const updatePhotosBtn = document.getElementById('update-photos');
 const logoutBtn = document.getElementById('logout');
 let isSignupMode = true;
 
@@ -144,7 +145,7 @@ function initializeAutocomplete() {
     if (place.geometry) {
       const preview = document.getElementById('address-preview');
       preview.textContent = `Selected: ${place.formatted_address}`;
-      preview.style.color = '#28a745';
+      preview.style.color = '#00d4ff';
       console.log("Address selected:", place.formatted_address, "Coords:", place.geometry.location.lat(), place.geometry.location.lng());
     }
   });
@@ -183,11 +184,12 @@ authSubmit.onclick = async () => {
         endPeriod: document.getElementById('endPeriod').value,
         specials: document.getElementById('specials').value,
         approved: false,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        productPhotos: []
       };
       await db.collection('users').doc(user.uid).set(userData);
       console.log("User signed up:", user.uid);
-      uploadInitialPhotos(user.uid);
+      await uploadInitialPhotos(user.uid);
     } else {
       await auth.signInWithEmailAndPassword(email, password);
       console.log("User logged in:", auth.currentUser.uid);
@@ -203,8 +205,8 @@ async function uploadInitialPhotos(userId) {
   const photos = document.getElementById('photos').files;
   if (photos.length > 0) {
     const photoUrls = await uploadPhotos(photos, userId);
-    await db.collection('users').doc(userId).update({ photos: photoUrls });
-    console.log("Initial photos uploaded:", photoUrls);
+    await db.collection('users').doc(userId).update({ productPhotos: photoUrls });
+    console.log("Initial product photos uploaded:", photoUrls);
   }
 }
 
@@ -221,7 +223,10 @@ auth.onAuthStateChanged(async user => {
       vendorDashboard.style.display = 'block';
       if (userData.approved) {
         const pinDoc = await db.collection('pins').doc(user.uid).get();
-        liveToggle.onclick = () => toggleLiveStatus(user.uid, pinDoc.exists && pinDoc.data().live);
+        const isLive = pinDoc.exists && pinDoc.data().live;
+        liveToggle.textContent = isLive ? "Go Offline" : "Go Live";
+        liveToggle.onclick = () => toggleLiveStatus(user.uid, isLive);
+        updatePhotosBtn.onclick = () => updateProductPhotos(user.uid);
       }
     }
   } else {
@@ -248,6 +253,21 @@ async function toggleLiveStatus(userId, isLive) {
   }
 }
 
+async function updateProductPhotos(userId) {
+  const photos = document.getElementById('product-photos').files;
+  if (photos.length > 0) {
+    const photoUrls = await uploadPhotos(photos, userId);
+    await db.collection('users').doc(userId).update({
+      productPhotos: firebase.firestore.FieldValue.arrayUnion(...photoUrls)
+    });
+    await db.collection('pins').doc(userId).update({
+      productPhotos: firebase.firestore.FieldValue.arrayUnion(...photoUrls)
+    });
+    console.log("Product photos updated:", photoUrls);
+    alert("Product photos updated successfully!");
+  }
+}
+
 logoutBtn.onclick = async () => {
   await auth.signOut();
   console.log("User logged out");
@@ -263,8 +283,8 @@ function showBusinessPage(pin) {
   document.getElementById('page-specials').textContent = `Specials: ${pin.specials}`;
   const photosDiv = document.getElementById('page-photos');
   photosDiv.innerHTML = '';
-  if (pin.photos && pin.photos.length > 0) {
-    pin.photos.forEach(url => {
+  if (pin.productPhotos && pin.productPhotos.length > 0) {
+    pin.productPhotos.forEach(url => {
       const img = document.createElement('img');
       img.src = url;
       photosDiv.appendChild(img);
