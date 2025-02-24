@@ -23,7 +23,7 @@
       margin-bottom: 20px; 
       text-align: center; 
     }
-    #go-live-btn { 
+    #auth-btn { 
       background-color: #ff5733; 
       color: white; 
       border: none; 
@@ -35,7 +35,7 @@
       display: block; 
       margin: 0 auto 30px; 
     }
-    #go-live-btn:hover { 
+    #auth-btn:hover { 
       background-color: #e04e2b; 
       transform: scale(1.05); 
     }
@@ -46,7 +46,7 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
       margin-bottom: 40px; 
     }
-    #form { 
+    #auth-modal, #vendor-dashboard { 
       display: none; 
       background-color: white; 
       padding: 30px; 
@@ -55,7 +55,7 @@
       max-width: 500px; 
       margin: 0 auto 40px; 
     }
-    #business-form input, #business-form textarea, #business-form select { 
+    #auth-modal input, #vendor-dashboard input, #vendor-dashboard textarea, #vendor-dashboard select { 
       width: 100%; 
       padding: 10px; 
       margin: 8px 0; 
@@ -64,11 +64,11 @@
       box-sizing: border-box; 
       font-size: 1em; 
     }
-    #business-form textarea { 
+    #vendor-dashboard textarea { 
       height: 120px; 
       resize: vertical; 
     }
-    #business-form button { 
+    #auth-modal button, #vendor-dashboard button { 
       background-color: #ff5733; 
       color: white; 
       border: none; 
@@ -79,7 +79,7 @@
       transition: background-color 0.3s; 
       font-size: 1.1em; 
     }
-    #business-form button:hover { 
+    #auth-modal button:hover, #vendor-dashboard button:hover { 
       background-color: #e04e2b; 
     }
     .time-group { 
@@ -151,16 +151,18 @@
       margin-bottom: 15px; 
     }
   </style>
-  <!-- Add Google Fonts for modern typography -->
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="container">
     <h1>Streats Live</h1>
-    <button id="go-live-btn" onclick="showForm()">Go Live</button>
+    <button id="auth-btn">Sign Up / Login</button>
     <div id="map"></div>
-    <div id="form">
-      <form id="business-form">
+    <div id="auth-modal">
+      <h2 id="auth-title">Sign Up</h2>
+      <input type="email" id="email" placeholder="Email" required><br>
+      <input type="password" id="password" placeholder="Password" required><br>
+      <div id="signup-fields" style="display: none;">
         <input type="text" id="name" placeholder="Business Name" required><br>
         <input type="text" id="foodType" placeholder="Food Type (e.g., Tacos)" required><br>
         <input type="text" id="contact" placeholder="Contact Info" required><br>
@@ -183,8 +185,15 @@
         <textarea id="description" placeholder="Description" required></textarea><br>
         <input type="text" id="specials" placeholder="Specials (e.g., Taco Tuesday)" required><br>
         <input type="file" id="photos" accept="image/*" multiple><br>
-        <button type="submit">Submit</button>
-      </form>
+      </div>
+      <button id="auth-submit">Submit</button>
+      <p id="auth-toggle">Already have an account? <a href="#" onclick="toggleAuthMode()">Login</a></p>
+    </div>
+    <div id="vendor-dashboard">
+      <h2>Welcome, <span id="vendor-name"></span></h2>
+      <p id="approval-status"></p>
+      <button id="live-toggle">Go Live</button>
+      <button id="logout">Logout</button>
     </div>
     <div id="business-page">
       <h2 id="page-name"></h2>
@@ -207,8 +216,8 @@
   <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-firestore.js"></script>
   <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-storage.js"></script>
-  <!-- Replace YOUR_GOOGLE_API_KEY with your actual key -->
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDeaGTuprL_qbUkydv-DdDYiIgh0_XPu88&libraries=places"></script>
+  <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-auth.js"></script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_API_KEY&libraries=places"></script>
   <script src="script.js" defer></script>
 </body>
 </html>
