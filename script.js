@@ -153,7 +153,6 @@ function initializeSignUpAutocomplete() {
     const place = signupAutocomplete.getPlace();
     if (place.geometry) {
       document.getElementById('address-preview').textContent = `Selected: ${place.formatted_address}`;
-      document.getElementById('address-preview').style.color = '#00d4ff';
       console.log("Sign-up address selected:", place.formatted_address, "Coords:", place.geometry.location.lat(), place.geometry.location.lng());
     }
   });
@@ -171,7 +170,6 @@ function initializeDashAutocomplete() {
     const place = dashAutocomplete.getPlace();
     if (place.geometry) {
       document.getElementById('dash-address-preview').textContent = `Selected: ${place.formatted_address}`;
-      document.getElementById('dash-address-preview').style.color = '#00d4ff';
       console.log("Dashboard address selected:", place.formatted_address, "Coords:", place.geometry.location.lat(), place.geometry.location.lng());
     }
   });
@@ -229,13 +227,13 @@ authSubmit.onclick = async () => {
 
 async function uploadInitialPhotos(userId) {
   const photos = document.getElementById('photos').files;
-  console.log("Uploading initial photos:", photos.length, "files");
+  console.log("Uploading initial photos:", photos.length, "files detected");
   if (photos.length > 0) {
     const photoUrls = await uploadPhotos(photos, userId);
     await db.collection('users').doc(userId).update({ productPhotos: photoUrls });
     console.log("Initial product photos uploaded:", photoUrls);
   } else {
-    console.log("No initial photos to upload");
+    console.log("No initial photos selected");
   }
 }
 
@@ -332,7 +330,7 @@ updateProfileBtn.onclick = async () => {
     console.log("Updating profile with:", updatedData);
     await db.collection('users').doc(userId).update(updatedData);
     const photos = document.getElementById('dash-photos').files;
-    console.log("Photo upload triggered, files:", photos.length);
+    console.log("Photo upload triggered, files detected:", photos.length);
     if (photos.length > 0) {
       const photoUrls = await uploadPhotos(photos, userId);
       await db.collection('users').doc(userId).update({
@@ -391,14 +389,14 @@ async function uploadPhotos(files, pinId) {
   const photoUrls = [];
   for (const file of files) {
     const ref = storage.ref().child(`pins/${pinId}/${Date.now()}_${file.name}`);
-    console.log("Uploading file:", file.name);
+    console.log("Attempting to upload file:", file.name);
     try {
-      await ref.put(file);
-      const url = await ref.getDownloadURL();
+      const snapshot = await ref.put(file);
+      const url = await snapshot.ref.getDownloadURL();
       photoUrls.push(url);
-      console.log("Uploaded photo:", url);
+      console.log("Successfully uploaded photo:", url);
     } catch (error) {
-      console.error("Photo upload failed for", file.name, ":", error);
+      console.error("Failed to upload photo:", file.name, error);
     }
   }
   return photoUrls;
