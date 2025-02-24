@@ -9,23 +9,22 @@ const firebaseConfig = {
   appId: "1:435856449927:web:021d6dae14a84320627322",
 };
 
-// Replace with your Mapbox token
 const MAPBOX_TOKEN = 'pk.eyJ1IjoiZWF2aWxhMTQyMiIsImEiOiJjbTdpMjZsYngwY2IxMm1vaWtjM3ZieGRmIn0.C9ja6tcQ-iNu91gSDggyxg';
 
-// Initialize Firebase
-let db, storage;
+let db, storage, auth;
 if (typeof firebase !== 'undefined') {
   try {
     firebase.initializeApp(firebaseConfig);
     console.log("Firebase initialized successfully");
     db = firebase.firestore();
     storage = firebase.storage();
+    auth = firebase.auth();
   } catch (error) {
     console.error("Firebase initialization failed:", error);
   }
 }
 
-// Initialize Leaflet map with Mapbox
+// Initialize Leaflet map
 console.log("Attempting to load map...");
 let map;
 navigator.geolocation.getCurrentPosition(position => {
@@ -39,15 +38,15 @@ navigator.geolocation.getCurrentPosition(position => {
   }).addTo(map);
 
   const foodTruckIcon = L.icon({
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/1048/1048313.png', // Food truck icon
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/1048/1048313.png',
     iconSize: [38, 38],
     iconAnchor: [19, 38],
     popupAnchor: [0, -38]
   });
 
   if (db) {
-    db.collection('pins').where('status', '==', 'approved').onSnapshot(snapshot => {
-      console.log("Fetching approved pins...");
+    db.collection('pins').where('live', '==', true).onSnapshot(snapshot => {
+      console.log("Fetching live pins...");
       map.eachLayer(layer => { if (layer instanceof L.Marker) map.removeLayer(layer); });
       snapshot.forEach(doc => {
         const pin = doc.data();
@@ -90,6 +89,43 @@ navigator.geolocation.getCurrentPosition(position => {
   }).addTo(map);
 });
 
+// Authentication handling
+const authBtn = document.getElementById('auth-btn');
+const authModal = document.getElementById('auth-modal');
+const authTitle = document.getElementById('auth-title');
+const signupFields = document.getElementById('signup-fields');
+const authSubmit = document.getElementById('auth-submit');
+const authToggle = document.getElementById('auth-toggle');
+const vendorDashboard = document.getElementById('vendor-dashboard');
+const liveToggle = document.getElementById('live-toggle');
+const logoutBtn = document.getElementById('logout');
+let isSignupMode = true;
+
+authBtn.onclick = () => {
+  authModal.style.display = 'block';
+  updateAuthMode();
+};
+
+function updateAuthMode() {
+  if (isSignupMode) {
+    authTitle.textContent = "Sign Up";
+    signupFields.style.display = 'block';
+    authSubmit.textContent = "Sign Up";
+    authToggle.innerHTML = 'Already have an account? <a href="#" onclick="toggleAuthMode()">Login</a>';
+  } else {
+    authTitle.textContent = "Login";
+    signupFields.style.display = 'none';
+    authSubmit.textContent = "Login";
+    authToggle.innerHTML = 'Need an account? <a href="#" onclick="toggleAuthMode()">Sign Up</a>';
+  }
+}
+
+function toggleAuthMode() {
+  isSignupMode = !isSignupMode;
+  updateAuthMode();
+  event.preventDefault();
+}
+
 // Autocomplete setup
 let autocomplete;
 function initializeAutocomplete() {
@@ -110,81 +146,112 @@ function initializeAutocomplete() {
       preview.textContent = `Selected: ${place.formatted_address}`;
       preview.style.color = '#28a745';
       console.log("Address selected:", place.formatted_address, "Coords:", place.geometry.location.lat(), place.geometry.location.lng());
-    } else {
-      console.log("No geometry for selected place");
     }
   });
 }
 
-// Call this when script loads
 initializeAutocomplete();
 
-function showForm() {
-  console.log("Go Live button clicked");
-  const form = document.getElementById('form');
-  if (form) {
-    form.style.display = 'block';
-  } else {
-    console.error("Form element not found");
+authSubmit.onclick = async () => {
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  try {
+    if (isSignupMode) {
+      const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+      const user = userCredential.user;
+      const place = autocomplete.getPlace();
+      if (!place || !place.geometry) {
+        throw new Error("Please select an address from the dropdown");
+      }
+      const address = place.formatted_address;
+      const coords = {
+        latitude: place.geometry.location.lat(),
+        longitude: place.geometry.location.lng()
+      };
+      const userData = {
+        email: email,
+        name: document.getElementById('name').value,
+        foodType: document.getElementById('foodType').value,
+        contact: document.getElementById('contact').value,
+        description: document.getElementById('description').value,
+        address: address,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        startTime: document.getElementById('startTime').value,
+        startPeriod: document.getElementById('startPeriod').value,
+        endTime: document.getElementById('endTime').value,
+        endPeriod: document.getElementById('endPeriod').value,
+        specials: document.getElementById('specials').value,
+        approved: false,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      await db.collection('users').doc(user.uid).set(userData);
+      console.log("User signed up:", user.uid);
+      uploadInitialPhotos(user.uid);
+    } else {
+      await auth.signInWithEmailAndPassword(email, password);
+      console.log("User logged in:", auth.currentUser.uid);
+    }
+    authModal.style.display = 'none';
+  } catch (error) {
+    console.error("Auth failed:", error);
+    alert("Error: " + error.message);
+  }
+};
+
+async function uploadInitialPhotos(userId) {
+  const photos = document.getElementById('photos').files;
+  if (photos.length > 0) {
+    const photoUrls = await uploadPhotos(photos, userId);
+    await db.collection('users').doc(userId).update({ photos: photoUrls });
+    console.log("Initial photos uploaded:", photoUrls);
   }
 }
 
-const formElement = document.getElementById('business-form');
-if (formElement) {
-  formElement.onsubmit = async (e) => {
-    e.preventDefault();
-    console.log("Form submitted");
-    if (db && storage) {
-      try {
-        const place = autocomplete.getPlace();
-        if (!place || !place.geometry) {
-          throw new Error("Please select an address from the dropdown");
-        }
-        const address = place.formatted_address;
-        const coords = {
-          latitude: place.geometry.location.lat(),
-          longitude: place.geometry.location.lng()
-        };
-        console.log("Selected address:", address, "Coords:", coords);
-        const data = {
-          name: document.getElementById('name').value,
-          foodType: document.getElementById('foodType').value,
-          contact: document.getElementById('contact').value,
-          description: document.getElementById('description').value,
-          address: address,
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          startTime: document.getElementById('startTime').value,
-          startPeriod: document.getElementById('startPeriod').value,
-          endTime: document.getElementById('endTime').value,
-          endPeriod: document.getElementById('endPeriod').value,
-          specials: document.getElementById('specials').value,
-          status: 'pending',
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-        console.log("Data to save:", data);
-        const docRef = await db.collection('pins').add(data);
-        console.log("Document added with ID:", docRef.id);
-        const photos = document.getElementById('photos').files;
-        if (photos.length > 0) {
-          const photoUrls = await uploadPhotos(photos, docRef.id);
-          await docRef.update({ photos: photoUrls });
-          console.log("Photos uploaded:", photoUrls);
-        }
-        alert('Submitted for approval!');
-        document.getElementById('form').style.display = 'none';
-        document.getElementById('address-preview').textContent = '';
-        e.target.reset();
-      } catch (error) {
-        console.error("Form submission failed:", error);
-        alert("Error: " + error.message);
+auth.onAuthStateChanged(async user => {
+  if (user) {
+    authBtn.style.display = 'none';
+    const userDoc = await db.collection('users').doc(user.uid).get();
+    if (userDoc.exists) {
+      const userData = userDoc.data();
+      document.getElementById('vendor-name').textContent = userData.name;
+      document.getElementById('approval-status').textContent = userData.approved ? "Approved" : "Pending Approval";
+      liveToggle.style.display = userData.approved ? 'block' : 'none';
+      liveToggle.textContent = userData.live ? "Go Offline" : "Go Live";
+      vendorDashboard.style.display = 'block';
+      if (userData.approved) {
+        const pinDoc = await db.collection('pins').doc(user.uid).get();
+        liveToggle.onclick = () => toggleLiveStatus(user.uid, pinDoc.exists && pinDoc.data().live);
       }
-    } else {
-      console.error("Firebase not initialized");
-      alert("Firebase not available");
     }
-  };
+  } else {
+    authBtn.style.display = 'block';
+    vendorDashboard.style.display = 'none';
+  }
+});
+
+async function toggleLiveStatus(userId, isLive) {
+  const userDoc = await db.collection('users').doc(userId).get();
+  const userData = userDoc.data();
+  if (isLive) {
+    await db.collection('pins').doc(userId).delete();
+    console.log("Vendor went offline:", userId);
+    liveToggle.textContent = "Go Live";
+  } else {
+    await db.collection('pins').doc(userId).set({
+      ...userData,
+      live: true,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    console.log("Vendor went live:", userId);
+    liveToggle.textContent = "Go Offline";
+  }
 }
+
+logoutBtn.onclick = async () => {
+  await auth.signOut();
+  console.log("User logged out");
+};
 
 function showBusinessPage(pin) {
   document.getElementById('page-name').textContent = pin.name;
