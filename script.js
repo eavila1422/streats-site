@@ -96,14 +96,16 @@ const authTitle = document.getElementById('auth-title');
 const signupFields = document.getElementById('signup-fields');
 const authSubmit = document.getElementById('auth-submit');
 const authToggle = document.getElementById('auth-toggle');
-const vendorDashboard = document.getElementById('vendor-dashboard');
-const liveToggle = document.getElementById('live-toggle');
-const updatePhotosBtn = document.getElementById('update-photos');
+const dashboard = document.getElementById('dashboard');
+const dashboardBtn = document.getElementById('dashboard-btn');
 const logoutBtn = document.getElementById('logout');
+const updateProfileBtn = document.getElementById('update-profile');
+const liveToggle = document.getElementById('live-toggle');
 let isSignupMode = true;
 
 authBtn.onclick = () => {
   authModal.style.display = 'block';
+  dashboard.style.display = 'none';
   updateAuthMode();
 };
 
@@ -127,31 +129,47 @@ function toggleAuthMode() {
   event.preventDefault();
 }
 
-// Autocomplete setup
-let autocomplete;
-function initializeAutocomplete() {
+// Autocomplete setup for sign-up and dashboard
+let signupAutocomplete, dashAutocomplete;
+function initializeSignUpAutocomplete() {
   const input = document.getElementById('address');
-  if (!input) {
-    console.error("Address input not found");
-    return;
-  }
-  autocomplete = new google.maps.places.Autocomplete(input, {
+  if (!input) return;
+  signupAutocomplete = new google.maps.places.Autocomplete(input, {
     types: ['address'],
     componentRestrictions: { country: 'us' },
     fields: ['formatted_address', 'geometry.location']
   });
-  autocomplete.addListener('place_changed', () => {
-    const place = autocomplete.getPlace();
+  signupAutocomplete.addListener('place_changed', () => {
+    const place = signupAutocomplete.getPlace();
     if (place.geometry) {
       const preview = document.getElementById('address-preview');
       preview.textContent = `Selected: ${place.formatted_address}`;
       preview.style.color = '#00d4ff';
-      console.log("Address selected:", place.formatted_address, "Coords:", place.geometry.location.lat(), place.geometry.location.lng());
+      console.log("Sign-up address selected:", place.formatted_address, "Coords:", place.geometry.location.lat(), place.geometry.location.lng());
     }
   });
 }
 
-initializeAutocomplete();
+function initializeDashAutocomplete() {
+  const input = document.getElementById('dash-address');
+  if (!input) return;
+  dashAutocomplete = new google.maps.places.Autocomplete(input, {
+    types: ['address'],
+    componentRestrictions: { country: 'us' },
+    fields: ['formatted_address', 'geometry.location']
+  });
+  dashAutocomplete.addListener('place_changed', () => {
+    const place = dashAutocomplete.getPlace();
+    if (place.geometry) {
+      const preview = document.getElementById('dash-address-preview');
+      preview.textContent = `Selected: ${place.formatted_address}`;
+      preview.style.color = '#00d4ff';
+      console.log("Dashboard address selected:", place.formatted_address, "Coords:", place.geometry.location.lat(), place.geometry.location.lng());
+    }
+  });
+}
+
+initializeSignUpAutocomplete();
 
 authSubmit.onclick = async () => {
   const email = document.getElementById('email').value;
@@ -160,7 +178,7 @@ authSubmit.onclick = async () => {
     if (isSignupMode) {
       const userCredential = await auth.createUserWithEmailAndPassword(email, password);
       const user = userCredential.user;
-      const place = autocomplete.getPlace();
+      const place = signupAutocomplete.getPlace();
       if (!place || !place.geometry) {
         throw new Error("Please select an address from the dropdown");
       }
@@ -213,25 +231,26 @@ async function uploadInitialPhotos(userId) {
 auth.onAuthStateChanged(async user => {
   if (user) {
     authBtn.style.display = 'none';
+    dashboardBtn.style.display = 'block';
+    logoutBtn.style.display = 'block';
     const userDoc = await db.collection('users').doc(user.uid).get();
     if (userDoc.exists) {
       const userData = userDoc.data();
-      document.getElementById('vendor-name').textContent = userData.name;
-      document.getElementById('approval-status').textContent = userData.approved ? "Approved" : "Pending Approval";
-      liveToggle.style.display = userData.approved ? 'block' : 'none';
-      liveToggle.textContent = userData.live ? "Go Offline" : "Go Live";
-      vendorDashboard.style.display = 'block';
-      if (userData.approved) {
-        const pinDoc = await db.collection('pins').doc(user.uid).get();
-        const isLive = pinDoc.exists && pinDoc.data().live;
-        liveToggle.textContent = isLive ? "Go Offline" : "Go Live";
-        liveToggle.onclick = () => toggleLiveStatus(user.uid, isLive);
-        updatePhotosBtn.onclick = () => updateProductPhotos(user.uid);
-      }
+      document.getElementById('sidebar-name').textContent = userData.name;
+      document.getElementById('sidebar-status').textContent = userData.approved ? "Approved" : "Pending Approval";
+      const pinDoc = await db.collection('pins').doc(user.uid).get();
+      const isLive = pinDoc.exists && pinDoc.data().live;
+      liveToggle.textContent = isLive ? "Go Offline" : "Go Live";
+      liveToggle.onclick = () => toggleLiveStatus(user.uid, isLive);
+      dashboardBtn.onclick = () => showDashboard(userData);
     }
   } else {
     authBtn.style.display = 'block';
-    vendorDashboard.style.display = 'none';
+    dashboardBtn.style.display = 'none';
+    logoutBtn.style.display = 'none';
+    dashboard.style.display = 'none';
+    document.getElementById('sidebar-name').textContent = '';
+    document.getElementById('sidebar-status').textContent = '';
   }
 });
 
@@ -253,24 +272,81 @@ async function toggleLiveStatus(userId, isLive) {
   }
 }
 
-async function updateProductPhotos(userId) {
-  const photos = document.getElementById('product-photos').files;
-  if (photos.length > 0) {
-    const photoUrls = await uploadPhotos(photos, userId);
-    await db.collection('users').doc(userId).update({
-      productPhotos: firebase.firestore.FieldValue.arrayUnion(...photoUrls)
-    });
-    await db.collection('pins').doc(userId).update({
-      productPhotos: firebase.firestore.FieldValue.arrayUnion(...photoUrls)
-    });
-    console.log("Product photos updated:", photoUrls);
-    alert("Product photos updated successfully!");
-  }
+function showDashboard(userData) {
+  authModal.style.display = 'none';
+  dashboard.style.display = 'block';
+  document.getElementById('dash-name').value = userData.name || '';
+  document.getElementById('dash-foodType').value = userData.foodType || '';
+  document.getElementById('dash-contact').value = userData.contact || '';
+  document.getElementById('dash-address').value = userData.address || '';
+  document.getElementById('dash-startTime').value = userData.startTime || '';
+  document.getElementById('dash-startPeriod').value = userData.startPeriod || 'AM';
+  document.getElementById('dash-endTime').value = userData.endTime || '';
+  document.getElementById('dash-endPeriod').value = userData.endPeriod || 'PM';
+  document.getElementById('dash-description').value = userData.description || '';
+  document.getElementById('dash-specials').value = userData.specials || '';
+  initializeDashAutocomplete();
 }
+
+updateProfileBtn.onclick = async () => {
+  const userId = auth.currentUser.uid;
+  try {
+    const place = dashAutocomplete.getPlace();
+    let address = document.getElementById('dash-address').value;
+    let coords = { latitude: null, longitude: null };
+    if (place && place.geometry) {
+      address = place.formatted_address;
+      coords.latitude = place.geometry.location.lat();
+      coords.longitude = place.geometry.location.lng();
+    } else {
+      const existingData = (await db.collection('users').doc(userId).get()).data();
+      coords.latitude = existingData.latitude;
+      coords.longitude = existingData.longitude;
+    }
+    const updatedData = {
+      name: document.getElementById('dash-name').value,
+      foodType: document.getElementById('dash-foodType').value,
+      contact: document.getElementById('dash-contact').value,
+      address: address,
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      startTime: document.getElementById('dash-startTime').value,
+      startPeriod: document.getElementById('dash-startPeriod').value,
+      endTime: document.getElementById('dash-endTime').value,
+      endPeriod: document.getElementById('dash-endPeriod').value,
+      specials: document.getElementById('dash-specials').value,
+      description: document.getElementById('dash-description').value,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    console.log("Updating profile with:", updatedData);
+    await db.collection('users').doc(userId).update(updatedData);
+    const photos = document.getElementById('dash-photos').files;
+    if (photos.length > 0) {
+      const photoUrls = await uploadPhotos(photos, userId);
+      await db.collection('users').doc(userId).update({
+        productPhotos: firebase.firestore.FieldValue.arrayUnion(...photoUrls)
+      });
+      const pinDoc = await db.collection('pins').doc(userId).get();
+      if (pinDoc.exists && pinDoc.data().live) {
+        await db.collection('pins').doc(userId).update({
+          productPhotos: firebase.firestore.FieldValue.arrayUnion(...photoUrls),
+          ...updatedData
+        });
+      }
+      console.log("Product photos uploaded:", photoUrls);
+    }
+    console.log("Profile updated for:", userId);
+    alert("Profile updated successfully!");
+  } catch (error) {
+    console.error("Profile update failed:", error);
+    alert("Error: " + error.message);
+  }
+};
 
 logoutBtn.onclick = async () => {
   await auth.signOut();
   console.log("User logged out");
+  dashboard.style.display = 'none';
 };
 
 function showBusinessPage(pin) {
@@ -300,10 +376,11 @@ function closeBusinessPage() {
 async function uploadPhotos(files, pinId) {
   const photoUrls = [];
   for (const file of files) {
-    const ref = storage.ref().child(`pins/${pinId}/${file.name}`);
+    const ref = storage.ref().child(`pins/${pinId}/${Date.now()}_${file.name}`);
     await ref.put(file);
     const url = await ref.getDownloadURL();
     photoUrls.push(url);
+    console.log("Uploaded photo:", url);
   }
   return photoUrls;
 }
