@@ -89,6 +89,16 @@ navigator.geolocation.getCurrentPosition(position => {
   }).addTo(map);
 });
 
+// Sidebar toggle
+const sidebar = document.getElementById('sidebar');
+const sidebarToggle = document.getElementById('sidebar-toggle');
+const content = document.getElementById('content');
+sidebarToggle.onclick = () => {
+  sidebar.classList.toggle('hidden');
+  content.classList.toggle('full');
+  sidebarToggle.classList.toggle('hidden');
+};
+
 // Authentication handling
 const authBtn = document.getElementById('auth-btn');
 const authModal = document.getElementById('auth-modal');
@@ -129,7 +139,7 @@ function toggleAuthMode() {
   event.preventDefault();
 }
 
-// Autocomplete setup for sign-up and dashboard
+// Autocomplete setup
 let signupAutocomplete, dashAutocomplete;
 function initializeSignUpAutocomplete() {
   const input = document.getElementById('address');
@@ -142,9 +152,8 @@ function initializeSignUpAutocomplete() {
   signupAutocomplete.addListener('place_changed', () => {
     const place = signupAutocomplete.getPlace();
     if (place.geometry) {
-      const preview = document.getElementById('address-preview');
-      preview.textContent = `Selected: ${place.formatted_address}`;
-      preview.style.color = '#00d4ff';
+      document.getElementById('address-preview').textContent = `Selected: ${place.formatted_address}`;
+      document.getElementById('address-preview').style.color = '#00d4ff';
       console.log("Sign-up address selected:", place.formatted_address, "Coords:", place.geometry.location.lat(), place.geometry.location.lng());
     }
   });
@@ -161,9 +170,8 @@ function initializeDashAutocomplete() {
   dashAutocomplete.addListener('place_changed', () => {
     const place = dashAutocomplete.getPlace();
     if (place.geometry) {
-      const preview = document.getElementById('dash-address-preview');
-      preview.textContent = `Selected: ${place.formatted_address}`;
-      preview.style.color = '#00d4ff';
+      document.getElementById('dash-address-preview').textContent = `Selected: ${place.formatted_address}`;
+      document.getElementById('dash-address-preview').style.color = '#00d4ff';
       console.log("Dashboard address selected:", place.formatted_address, "Coords:", place.geometry.location.lat(), place.geometry.location.lng());
     }
   });
@@ -221,10 +229,13 @@ authSubmit.onclick = async () => {
 
 async function uploadInitialPhotos(userId) {
   const photos = document.getElementById('photos').files;
+  console.log("Uploading initial photos:", photos.length, "files");
   if (photos.length > 0) {
     const photoUrls = await uploadPhotos(photos, userId);
     await db.collection('users').doc(userId).update({ productPhotos: photoUrls });
     console.log("Initial product photos uploaded:", photoUrls);
+  } else {
+    console.log("No initial photos to upload");
   }
 }
 
@@ -321,6 +332,7 @@ updateProfileBtn.onclick = async () => {
     console.log("Updating profile with:", updatedData);
     await db.collection('users').doc(userId).update(updatedData);
     const photos = document.getElementById('dash-photos').files;
+    console.log("Photo upload triggered, files:", photos.length);
     if (photos.length > 0) {
       const photoUrls = await uploadPhotos(photos, userId);
       await db.collection('users').doc(userId).update({
@@ -334,6 +346,8 @@ updateProfileBtn.onclick = async () => {
         });
       }
       console.log("Product photos uploaded:", photoUrls);
+    } else {
+      console.log("No photos selected for upload");
     }
     console.log("Profile updated for:", userId);
     alert("Profile updated successfully!");
@@ -377,10 +391,15 @@ async function uploadPhotos(files, pinId) {
   const photoUrls = [];
   for (const file of files) {
     const ref = storage.ref().child(`pins/${pinId}/${Date.now()}_${file.name}`);
-    await ref.put(file);
-    const url = await ref.getDownloadURL();
-    photoUrls.push(url);
-    console.log("Uploaded photo:", url);
+    console.log("Uploading file:", file.name);
+    try {
+      await ref.put(file);
+      const url = await ref.getDownloadURL();
+      photoUrls.push(url);
+      console.log("Uploaded photo:", url);
+    } catch (error) {
+      console.error("Photo upload failed for", file.name, ":", error);
+    }
   }
   return photoUrls;
 }
