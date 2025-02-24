@@ -16,6 +16,7 @@
       max-width: 1400px; 
       margin: 0 auto; 
       padding: 50px 20px; 
+      display: flex; 
     }
     h1 { 
       color: #00d4ff; 
@@ -24,22 +25,45 @@
       text-shadow: 0 0 10px rgba(0, 212, 255, 0.7); 
       margin-bottom: 30px; 
     }
-    #auth-btn { 
+    #sidebar { 
+      width: 300px; 
+      background: rgba(30, 30, 47, 0.95); 
+      padding: 30px; 
+      border-radius: 20px 0 0 20px; 
+      box-shadow: 0 0 20px rgba(0, 212, 255, 0.3); 
+      height: calc(100vh - 100px); 
+      position: fixed; 
+      left: 0; 
+      top: 0; 
+    }
+    #sidebar button { 
       background: linear-gradient(45deg, #00d4ff, #ff4081); 
       color: #fff; 
       border: none; 
-      padding: 15px 30px; 
-      font-size: 1.2em; 
+      padding: 15px; 
+      width: 100%; 
+      border-radius: 8px; 
       cursor: pointer; 
-      border-radius: 50px; 
-      box-shadow: 0 5px 15px rgba(0, 212, 255, 0.5); 
+      font-size: 1.1em; 
+      margin: 10px 0; 
       transition: transform 0.3s, box-shadow 0.3s; 
-      display: block; 
-      margin: 0 auto 40px; 
     }
-    #auth-btn:hover { 
-      transform: scale(1.1); 
-      box-shadow: 0 8px 20px rgba(0, 212, 255, 0.8); 
+    #sidebar button:hover { 
+      transform: scale(1.05); 
+      box-shadow: 0 5px 15px rgba(255, 64, 129, 0.7); 
+    }
+    #sidebar .user-info { 
+      text-align: center; 
+      margin-bottom: 30px; 
+    }
+    #sidebar .user-info h2 { 
+      color: #00d4ff; 
+      font-size: 1.8em; 
+      text-shadow: 0 0 5px rgba(0, 212, 255, 0.7); 
+    }
+    #content { 
+      flex: 1; 
+      margin-left: 320px; 
     }
     #map { 
       height: 700px; 
@@ -49,26 +73,21 @@
       margin-bottom: 50px; 
       background: #1e1e2f; 
     }
-    #auth-modal, #vendor-dashboard { 
+    #auth-modal, #dashboard { 
       display: none; 
       background: rgba(30, 30, 47, 0.95); 
       padding: 40px; 
       border-radius: 20px; 
       box-shadow: 0 0 30px rgba(0, 212, 255, 0.5); 
-      max-width: 600px; 
+      max-width: 800px; 
       margin: 0 auto 50px; 
-      position: fixed; 
-      top: 50%; 
-      left: 50%; 
-      transform: translate(-50%, -50%); 
-      z-index: 1000; 
       animation: fadeIn 0.5s ease; 
     }
     @keyframes fadeIn { 
-      from { opacity: 0; transform: translate(-50%, -60%); } 
-      to { opacity: 1; transform: translate(-50%, -50%); } 
+      from { opacity: 0; transform: translateY(-20px); } 
+      to { opacity: 1; transform: translateY(0); } 
     }
-    #auth-modal input, #vendor-dashboard input, #vendor-dashboard textarea, #vendor-dashboard select { 
+    #auth-modal input, #dashboard input, #dashboard textarea, #dashboard select { 
       width: 100%; 
       padding: 12px; 
       margin: 10px 0; 
@@ -79,15 +98,15 @@
       font-size: 1em; 
       transition: border-color 0.3s; 
     }
-    #auth-modal input:focus, #vendor-dashboard input:focus, #vendor-dashboard textarea:focus, #vendor-dashboard select:focus { 
+    #auth-modal input:focus, #dashboard input:focus, #dashboard textarea:focus, #dashboard select:focus { 
       border-color: #ff4081; 
       outline: none; 
     }
-    #vendor-dashboard textarea { 
+    #dashboard textarea { 
       height: 140px; 
       resize: vertical; 
     }
-    #auth-modal button, #vendor-dashboard button { 
+    #auth-modal button, #dashboard button { 
       background: linear-gradient(45deg, #00d4ff, #ff4081); 
       color: #fff; 
       border: none; 
@@ -96,10 +115,10 @@
       border-radius: 8px; 
       cursor: pointer; 
       font-size: 1.1em; 
-      transition: transform 0.3s, box-shadow 0.3s; 
       margin-top: 10px; 
+      transition: transform 0.3s, box-shadow 0.3s; 
     }
-    #auth-modal button:hover, #vendor-dashboard button:hover { 
+    #auth-modal button:hover, #dashboard button:hover { 
       transform: scale(1.05); 
       box-shadow: 0 5px 15px rgba(255, 64, 129, 0.7); 
     }
@@ -165,7 +184,6 @@
       border-radius: 20px; 
       box-shadow: 0 0 20px rgba(0, 212, 255, 0.3); 
       text-align: left; 
-      margin-top: 50px; 
     }
     #about h2 { 
       color: #00d4ff; 
@@ -182,47 +200,82 @@
 </head>
 <body>
   <div class="container">
-    <h1>Streats Live</h1>
-    <button id="auth-btn">Sign Up / Login</button>
-    <div id="map"></div>
-    <div id="auth-modal">
-      <h2 id="auth-title">Sign Up</h2>
-      <input type="email" id="email" placeholder="Email" required><br>
-      <input type="password" id="password" placeholder="Password" required><br>
-      <div id="signup-fields" style="display: none;">
-        <input type="text" id="name" placeholder="Business Name" required><br>
-        <input type="text" id="foodType" placeholder="Food Type (e.g., Tacos)" required><br>
-        <input type="text" id="contact" placeholder="Contact Info" required><br>
-        <input type="text" id="address" placeholder="Start typing address..." required><br>
-        <div id="address-preview"></div>
-        <div class="time-group">
-          <input type="text" id="startTime" placeholder="Start (e.g., 9:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$" required>
-          <select id="startPeriod" required>
-            <option value="AM">AM</option>
-            <option value="PM">PM</option>
-          </select>
-        </div>
-        <div class="time-group">
-          <input type="text" id="endTime" placeholder="End (e.g., 5:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$" required>
-          <select id="endPeriod" required>
-            <option value="AM">AM</option>
-            <option value="PM">PM</option>
-          </select>
-        </div>
-        <textarea id="description" placeholder="Description" required></textarea><br>
-        <input type="text" id="specials" placeholder="Specials (e.g., Taco Tuesday)" required><br>
-        <input type="file" id="photos" accept="image/*" multiple><br>
+    <div id="sidebar">
+      <div class="user-info">
+        <h2 id="sidebar-name"></h2>
+        <p id="sidebar-status"></p>
       </div>
-      <button id="auth-submit">Submit</button>
-      <p id="auth-toggle">Already have an account? <a href="#" onclick="toggleAuthMode()">Login</a></p>
+      <button id="auth-btn">Sign Up / Login</button>
+      <button id="dashboard-btn" style="display: none;">Dashboard</button>
+      <button id="logout" style="display: none;">Logout</button>
     </div>
-    <div id="vendor-dashboard">
-      <h2>Welcome, <span id="vendor-name"></span></h2>
-      <p id="approval-status"></p>
-      <input type="file" id="product-photos" accept="image/*" multiple><br>
-      <button id="update-photos">Update Product Photos</button>
-      <button id="live-toggle">Go Live</button>
-      <button id="logout">Logout</button>
+    <div id="content">
+      <h1>Streats Live</h1>
+      <div id="map"></div>
+      <div id="auth-modal">
+        <h2 id="auth-title">Sign Up</h2>
+        <input type="email" id="email" placeholder="Email" required><br>
+        <input type="password" id="password" placeholder="Password" required><br>
+        <div id="signup-fields" style="display: none;">
+          <input type="text" id="name" placeholder="Business Name" required><br>
+          <input type="text" id="foodType" placeholder="Food Type (e.g., Tacos)" required><br>
+          <input type="text" id="contact" placeholder="Contact Info" required><br>
+          <input type="text" id="address" placeholder="Start typing address..." required><br>
+          <div id="address-preview"></div>
+          <div class="time-group">
+            <input type="text" id="startTime" placeholder="Start (e.g., 9:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$" required>
+            <select id="startPeriod" required>
+              <option value="AM">AM</option>
+              <option value="PM">PM</option>
+            </select>
+          </div>
+          <div class="time-group">
+            <input type="text" id="endTime" placeholder="End (e.g., 5:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$" required>
+            <select id="endPeriod" required>
+              <option value="AM">AM</option>
+              <option value="PM">PM</option>
+            </select>
+          </div>
+          <textarea id="description" placeholder="Description" required></textarea><br>
+          <input type="text" id="specials" placeholder="Specials (e.g., Taco Tuesday)" required><br>
+          <input type="file" id="photos" accept="image/*" multiple><br>
+        </div>
+        <button id="auth-submit">Submit</button>
+        <p id="auth-toggle">Already have an account? <a href="#" onclick="toggleAuthMode()">Login</a></p>
+      </div>
+      <div id="dashboard">
+        <h2>Dashboard</h2>
+        <input type="text" id="dash-name" placeholder="Business Name"><br>
+        <input type="text" id="dash-foodType" placeholder="Food Type"><br>
+        <input type="text" id="dash-contact" placeholder="Contact Info"><br>
+        <input type="text" id="dash-address" placeholder="Start typing address..."><br>
+        <div id="dash-address-preview"></div>
+        <div class="time-group">
+          <input type="text" id="dash-startTime" placeholder="Start (e.g., 9:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$">
+          <select id="dash-startPeriod">
+            <option value="AM">AM</option>
+            <option value="PM">PM</option>
+          </select>
+        </div>
+        <div class="time-group">
+          <input type="text" id="dash-endTime" placeholder="End (e.g., 5:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$">
+          <select id="dash-endPeriod">
+            <option value="AM">AM</option>
+            <option value="PM">PM</option>
+          </select>
+        </div>
+        <textarea id="dash-description" placeholder="Description"></textarea><br>
+        <input type="text" id="dash-specials" placeholder="Specials"><br>
+        <input type="file" id="dash-photos" accept="image/*" multiple><br>
+        <button id="update-profile">Update Profile</button>
+        <button id="live-toggle">Go Live</button>
+      </div>
+      <div id="about">
+        <h2>About Streats Live</h2>
+        <p>Our mission is to connect food lovers with the best local food trucks, bringing communities together through delicious eats. We aim to make it easy for vendors to share their locations and for customers to find them in real-time.</p>
+        <p><strong>Goals:</strong> Empower small businesses, promote local cuisine, and create a vibrant food scene in every neighborhood.</p>
+        <p><strong>Team:</strong> A passionate group of foodies, developers, and dreamers working to revolutionize street food discovery.</p>
+      </div>
     </div>
     <div id="business-page">
       <h2 id="page-name"></h2>
@@ -234,12 +287,6 @@
       <p id="page-specials"></p>
       <div id="page-photos"></div>
       <button id="close-page" onclick="closeBusinessPage()">Close</button>
-    </div>
-    <div id="about">
-      <h2>About Streats Live</h2>
-      <p>Our mission is to connect food lovers with the best local food trucks, bringing communities together through delicious eats. We aim to make it easy for vendors to share their locations and for customers to find them in real-time.</p>
-      <p><strong>Goals:</strong> Empower small businesses, promote local cuisine, and create a vibrant food scene in every neighborhood.</p>
-      <p><strong>Team:</strong> A passionate group of foodies, developers, and dreamers working to revolutionize street food discovery.</p>
     </div>
   </div>
   <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-app.js"></script>
