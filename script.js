@@ -9,7 +9,7 @@ const firebaseConfig = {
   appId: "1:435856449927:web:021d6dae14a84320627322",
 };
 
-const MAPBOX_TOKEN = 'pk.eyJ1IjoiZWF2aWxhMTQyMiIsImEiOiJjbTdpMjZsYngwY2IxMm1vaWtjM3ZieGRmIn0.C9ja6tcQ-iNu91gSDggyxg';
+const MAPBOX_TOKEN = '';
 
 let db, storage, auth;
 if (typeof firebase !== 'undefined') {
