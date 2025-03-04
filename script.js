@@ -61,7 +61,8 @@ sidebarToggle.onclick = () => {
 };
 
 // Authentication handling
-const authBtn = document.getElementById('auth-btn');
+const vendorAuthBtn = document.getElementById('vendor-auth-btn');
+const customerAuthBtn = document.getElementById('customer-auth-btn');
 const authModal = document.getElementById('auth-modal');
 const authTitle = document.getElementById('auth-title');
 const signupFields = document.getElementById('signup-fields');
@@ -72,29 +73,33 @@ const dashboardBtn = document.getElementById('dashboard-btn');
 const logoutBtn = document.getElementById('logout');
 const updateProfileBtn = document.getElementById('update-profile');
 const liveToggle = document.getElementById('live-toggle');
-const userTypeSelect = document.getElementById('user-type');
 const vendorFields = document.getElementById('vendor-fields');
 let isSignupMode = true;
+let authType = null;
 
-authBtn.onclick = () => {
+vendorAuthBtn.onclick = () => {
+  authType = 'vendor';
   authModal.style.display = 'block';
   dashboard.style.display = 'none';
   updateAuthMode();
 };
 
-userTypeSelect.onchange = () => {
-  vendorFields.style.display = userTypeSelect.value === 'vendor' ? 'block' : 'none';
+customerAuthBtn.onclick = () => {
+  authType = 'customer';
+  authModal.style.display = 'block';
+  dashboard.style.display = 'none';
+  updateAuthMode();
 };
 
 function updateAuthMode() {
   if (isSignupMode) {
-    authTitle.textContent = "Sign Up";
+    authTitle.textContent = authType === 'vendor' ? "Vendor Sign Up" : "Customer Sign Up";
     signupFields.style.display = 'block';
+    vendorFields.style.display = authType === 'vendor' ? 'block' : 'none';
     authSubmit.textContent = "Sign Up";
     authToggle.innerHTML = 'Already have an account? <a href="#" onclick="toggleAuthMode()">Login</a>';
-    vendorFields.style.display = userTypeSelect.value === 'vendor' ? 'block' : 'none';
   } else {
-    authTitle.textContent = "Login";
+    authTitle.textContent = authType === 'vendor' ? "Vendor Login" : "Customer Login";
     signupFields.style.display = 'none';
     authSubmit.textContent = "Login";
     authToggle.innerHTML = 'Need an account? <a href="#" onclick="toggleAuthMode()">Sign Up</a>';
@@ -152,15 +157,13 @@ authSubmit.onclick = async () => {
     if (isSignupMode) {
       const userCredential = await auth.createUserWithEmailAndPassword(email, password);
       const user = userCredential.user;
-      const userType = document.getElementById('user-type').value;
       const userData = {
         email,
         name: document.getElementById('name').value,
-        type: userType,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       };
 
-      if (userType === 'vendor') {
+      if (authType === 'vendor') {
         const place = signupAutocomplete.getPlace();
         if (!place || !place.geometry) throw new Error("Please select an address from the dropdown");
         const address = place.formatted_address;
@@ -180,13 +183,14 @@ authSubmit.onclick = async () => {
           approved: false,
           productPhotos: []
         });
+        await db.collection('vendors').doc(user.uid).set(userData);
         await uploadInitialPhotos(user.uid);
+        console.log("Vendor signed up:", user.uid);
       } else {
-        userData.visitedTrucks = []; // Initialize for customers
+        userData.visitedTrucks = [];
+        await db.collection('customers').doc(user.uid).set(userData);
+        console.log("Customer signed up:", user.uid);
       }
-
-      await db.collection('users').doc(user.uid).set(userData);
-      console.log(`${userType} signed up:`, user.uid);
     } else {
       await auth.signInWithEmailAndPassword(email, password);
       console.log("User logged in:", auth.currentUser.uid);
@@ -203,35 +207,43 @@ async function uploadInitialPhotos(userId) {
   console.log("Uploading initial photos:", photos.length, "files detected");
   if (photos.length > 0) {
     const photoUrls = await uploadPhotos(photos, userId);
-    await db.collection('users').doc(userId).update({ productPhotos: photoUrls });
+    await db.collection('vendors').doc(userId).update({ productPhotos: photoUrls });
     console.log("Initial product photos uploaded:", photoUrls);
   }
 }
 
 auth.onAuthStateChanged(async user => {
   if (user) {
-    authBtn.style.display = 'none';
+    vendorAuthBtn.style.display = 'none';
+    customerAuthBtn.style.display = 'none';
     logoutBtn.style.display = 'block';
-    const userDoc = await db.collection('users').doc(user.uid).get();
-    if (userDoc.exists) {
-      const userData = userDoc.data();
-      document.getElementById('sidebar-name').textContent = userData.name;
-      if (userData.type === 'vendor') {
-        document.getElementById('sidebar-status').textContent = userData.approved ? "Approved" : "Pending";
+    const vendorDoc = await db.collection('vendors').doc(user.uid).get();
+    const customerDoc = await db.collection('customers').doc(user.uid).get();
+
+    if (vendorDoc.exists) {
+      const vendorData = vendorDoc.data();
+      document.getElementById('sidebar-name').textContent = vendorData.name;
+      document.getElementById('sidebar-status').textContent = vendorData.approved ? "Approved" : "Pending Approval";
+      if (vendorData.approved) {
         dashboardBtn.style.display = 'block';
         const pinDoc = await db.collection('pins').doc(user.uid).get();
         const isLive = pinDoc.exists && pinDoc.data().live;
         liveToggle.textContent = isLive ? "Go Offline" : "Go Live";
         liveToggle.onclick = () => toggleLiveStatus(user.uid, isLive);
-        dashboardBtn.onclick = () => showDashboard(userData);
-      } else if (userData.type === 'customer') {
-        document.getElementById('sidebar-status').textContent = "Customer";
+        dashboardBtn.onclick = () => showDashboard(vendorData);
+      } else {
         dashboardBtn.style.display = 'none';
-        loadVisitedTrucks(user.uid);
       }
+    } else if (customerDoc.exists) {
+      const customerData = customerDoc.data();
+      document.getElementById('sidebar-name').textContent = customerData.name;
+      document.getElementById('sidebar-status').textContent = "Foodie";
+      dashboardBtn.style.display = 'none';
+      loadVisitedTrucks(user.uid);
     }
   } else {
-    authBtn.style.display = 'block';
+    vendorAuthBtn.style.display = 'block';
+    customerAuthBtn.style.display = 'block';
     dashboardBtn.style.display = 'none';
     logoutBtn.style.display = 'none';
     dashboard.style.display = 'none';
@@ -242,18 +254,22 @@ auth.onAuthStateChanged(async user => {
 });
 
 async function toggleLiveStatus(userId, isLive) {
-  const userDoc = await db.collection('users').doc(userId).get();
-  const userData = userDoc.data();
+  const vendorDoc = await db.collection('vendors').doc(userId).get();
+  const vendorData = vendorDoc.data();
+  if (!vendorData.approved) {
+    alert("Your account must be approved before going live.");
+    return;
+  }
   if (isLive) {
     await db.collection('pins').doc(userId).delete();
     console.log("Vendor went offline:", userId);
     liveToggle.textContent = "Go Live";
   } else {
     await db.collection('pins').doc(userId).set({
-      ...userData,
+      ...vendorData,
       live: true,
-      latitude: userData.latitude,
-      longitude: userData.longitude,
+      latitude: vendorData.latitude,
+      longitude: vendorData.longitude,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     console.log("Vendor went live:", userId);
@@ -261,25 +277,30 @@ async function toggleLiveStatus(userId, isLive) {
   }
 }
 
-function showDashboard(userData) {
+function showDashboard(vendorData) {
   authModal.style.display = 'none';
   dashboard.style.display = 'block';
-  document.getElementById('dash-name').value = userData.name || '';
-  document.getElementById('dash-foodType').value = userData.foodType || '';
-  document.getElementById('dash-contact').value = userData.contact || '';
-  document.getElementById('dash-address').value = userData.address || '';
-  document.getElementById('dash-startTime').value = userData.startTime || '';
-  document.getElementById('dash-startPeriod').value = userData.startPeriod || 'AM';
-  document.getElementById('dash-endTime').value = userData.endTime || '';
-  document.getElementById('dash-endPeriod').value = userData.endPeriod || 'PM';
-  document.getElementById('dash-description').value = userData.description || '';
-  document.getElementById('dash-specials').value = userData.specials || '';
+  document.getElementById('dash-name').value = vendorData.name || '';
+  document.getElementById('dash-foodType').value = vendorData.foodType || '';
+  document.getElementById('dash-contact').value = vendorData.contact || '';
+  document.getElementById('dash-address').value = vendorData.address || '';
+  document.getElementById('dash-startTime').value = vendorData.startTime || '';
+  document.getElementById('dash-startPeriod').value = vendorData.startPeriod || 'AM';
+  document.getElementById('dash-endTime').value = vendorData.endTime || '';
+  document.getElementById('dash-endPeriod').value = vendorData.endPeriod || 'PM';
+  document.getElementById('dash-description').value = vendorData.description || '';
+  document.getElementById('dash-specials').value = vendorData.specials || '';
   initializeDashAutocomplete();
 }
 
 updateProfileBtn.onclick = async () => {
   const userId = auth.currentUser.uid;
   try {
+    const vendorDoc = await db.collection('vendors').doc(userId).get();
+    if (!vendorDoc.data().approved) {
+      alert("Your account must be approved to edit your profile.");
+      return;
+    }
     const place = dashAutocomplete.getPlace();
     let address = document.getElementById('dash-address').value;
     let coords = { latitude: null, longitude: null };
@@ -288,7 +309,7 @@ updateProfileBtn.onclick = async () => {
       coords.latitude = place.geometry.location.lat();
       coords.longitude = place.geometry.location.lng();
     } else {
-      const existingData = (await db.collection('users').doc(userId).get()).data();
+      const existingData = vendorDoc.data();
       coords.latitude = existingData.latitude;
       coords.longitude = existingData.longitude;
     }
@@ -307,11 +328,11 @@ updateProfileBtn.onclick = async () => {
       description: document.getElementById('dash-description').value,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
-    await db.collection('users').doc(userId).update(updatedData);
+    await db.collection('vendors').doc(userId).update(updatedData);
     const photos = document.getElementById('dash-photos').files;
     if (photos.length > 0) {
       const photoUrls = await uploadPhotos(photos, userId);
-      await db.collection('users').doc(userId).update({
+      await db.collection('vendors').doc(userId).update({
         productPhotos: firebase.firestore.FieldValue.arrayUnion(...photoUrls)
       });
       const pinDoc = await db.collection('pins').doc(userId).get();
@@ -455,7 +476,7 @@ async function showBusinessPage(pin) {
     });
   }
   const businessPage = document.getElementById('business-page');
-  businessPage.innerHTML += `
+  let ratingHTML = `
     <div class="rating">
       <label>Rate:</label>
       <select id="rating">
@@ -465,21 +486,33 @@ async function showBusinessPage(pin) {
         <option value="4">4</option>
         <option value="5">5</option>
       </select>
-      <button id="submit-rating" onclick="submitRating('${pin.id}')">Submit</button>
+      <button id="submit-rating">Submit</button>
     </div>
+  `;
+  businessPage.innerHTML += `
+    ${ratingHTML}
     <button onclick="shareOnX('${pin.name}')">Share on X</button>
     <button onclick="markVisited('${pin.id}')">Mark as Visited</button>
   `;
+  
   const submitBtn = document.getElementById('submit-rating');
-  if (!auth.currentUser || (await db.collection('users').doc(auth.currentUser.uid).get()).data().type !== 'customer') {
+  if (!auth.currentUser) {
     submitBtn.disabled = true;
     submitBtn.textContent = "Login as Customer to Rate";
   } else {
-    const userId = auth.currentUser.uid;
-    const existingReview = await db.collection('ratings').where('pinId', '==', pin.id).where('userId', '==', userId).get();
-    if (!existingReview.empty) {
+    const customerDoc = await db.collection('customers').doc(auth.currentUser.uid).get();
+    if (!customerDoc.exists) {
       submitBtn.disabled = true;
-      submitBtn.textContent = "Already Rated";
+      submitBtn.textContent = "Customer Account Required";
+    } else {
+      const userId = auth.currentUser.uid;
+      const existingReview = await db.collection('ratings').where('pinId', '==', pin.id).where('userId', '==', userId).get();
+      if (!existingReview.empty) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Already Rated";
+      } else {
+        submitBtn.onclick = () => submitRating(pin.id);
+      }
     }
   }
   businessPage.style.display = 'block';
@@ -495,8 +528,8 @@ async function submitRating(pinId) {
     return;
   }
   const userId = auth.currentUser.uid;
-  const userDoc = await db.collection('users').doc(userId).get();
-  if (userDoc.data().type !== 'customer') {
+  const customerDoc = await db.collection('customers').doc(userId).get();
+  if (!customerDoc.exists) {
     alert("Only customers can submit ratings.");
     return;
   }
@@ -529,15 +562,15 @@ async function markVisited(pinId) {
     return;
   }
   const userId = auth.currentUser.uid;
-  const userDoc = await db.collection('users').doc(userId).get();
-  if (userDoc.data().type !== 'customer') {
+  const customerDoc = await db.collection('customers').doc(userId).get();
+  if (!customerDoc.exists) {
     alert("Only customers can mark visits.");
     return;
   }
-  const visitedTrucks = userDoc.data().visitedTrucks || [];
+  const visitedTrucks = customerDoc.data().visitedTrucks || [];
   if (!visitedTrucks.includes(pinId)) {
     visitedTrucks.push(pinId);
-    await db.collection('users').doc(userId).update({
+    await db.collection('customers').doc(userId).update({
       visitedTrucks: visitedTrucks
     });
     console.log("Truck marked as visited:", pinId);
@@ -546,8 +579,9 @@ async function markVisited(pinId) {
 }
 
 async function loadVisitedTrucks(userId) {
-  const userDoc = await db.collection('users').doc(userId).get();
-  const visitedTrucks = userDoc.data().visitedTrucks || [];
+  const customerDoc = await db.collection('customers').doc(userId).get();
+  if (!customerDoc.exists) return;
+  const visitedTrucks = customerDoc.data().visitedTrucks || [];
   const visitedList = document.getElementById('visited-list');
   visitedList.innerHTML = '';
   if (visitedTrucks.length > 0) {
