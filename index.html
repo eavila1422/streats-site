@@ -91,6 +91,21 @@
       background: #00d4ff; 
       color: #0f0f0f; 
     }
+    #visited-trucks { 
+      margin-top: 20px; 
+    }
+    #visited-trucks h3 { 
+      color: #00d4ff; 
+      font-size: 1.2em; 
+    }
+    #visited-trucks ul { 
+      list-style: none; 
+      padding: 0; 
+    }
+    #visited-trucks li { 
+      padding: 5px 0; 
+      font-size: 0.9em; 
+    }
     #content { 
       flex: 1; 
       padding: 20px; 
@@ -332,6 +347,10 @@
       <button id="auth-btn"><i class="fas fa-user"></i> <span>Sign Up / Login</span></button>
       <button id="dashboard-btn" style="display: none;"><i class="fas fa-tachometer-alt"></i> <span>Dashboard</span></button>
       <button id="logout" style="display: none;"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></button>
+      <div id="visited-trucks" style="display: none;">
+        <h3>Visited Trucks</h3>
+        <ul id="visited-list"></ul>
+      </div>
     </div>
     <div id="content" class="full">
       <section class="hero">
@@ -348,7 +367,7 @@
         </select>
         <select id="status-filter">
           <option value="">All Status</option>
-          <option value="live">Live Now</option>
+          <option value="live" selected>Live Now</option>
           <option value="offline">Offline</option>
         </select>
       </div>
@@ -359,28 +378,34 @@
         <input type="email" id="email" placeholder="Email" required><br>
         <input type="password" id="password" placeholder="Password" required><br>
         <div id="signup-fields" style="display: none;">
-          <input type="text" id="name" placeholder="Business Name" required><br>
-          <input type="text" id="foodType" placeholder="Food Type (e.g., Tacos)" required><br>
-          <input type="text" id="contact" placeholder="Contact Info" required><br>
-          <input type="text" id="address" placeholder="Start typing address..." required><br>
-          <div id="address-preview"></div>
-          <div class="time-group">
-            <input type="text" id="startTime" placeholder="Start (e.g., 9:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$" required>
-            <select id="startPeriod" required>
-              <option value="AM">AM</option>
-              <option value="PM">PM</option>
-            </select>
+          <input type="text" id="name" placeholder="Name (Customer) or Business Name (Vendor)" required><br>
+          <select id="user-type" required>
+            <option value="customer">Customer</option>
+            <option value="vendor">Vendor</option>
+          </select><br>
+          <div id="vendor-fields" style="display: none;">
+            <input type="text" id="foodType" placeholder="Food Type (e.g., Tacos)" required><br>
+            <input type="text" id="contact" placeholder="Contact Info" required><br>
+            <input type="text" id="address" placeholder="Start typing address..." required><br>
+            <div id="address-preview"></div>
+            <div class="time-group">
+              <input type="text" id="startTime" placeholder="Start (e.g., 9:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$" required>
+              <select id="startPeriod" required>
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </div>
+            <div class="time-group">
+              <input type="text" id="endTime" placeholder="End (e.g., 5:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$" required>
+              <select id="endPeriod" required>
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </div>
+            <textarea id="description" placeholder="Description" required></textarea><br>
+            <input type="text" id="specials" placeholder="Specials (e.g., Taco Tuesday)" required><br>
+            <input type="file" id="photos" accept="image/*" multiple><br>
           </div>
-          <div class="time-group">
-            <input type="text" id="endTime" placeholder="End (e.g., 5:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$" required>
-            <select id="endPeriod" required>
-              <option value="AM">AM</option>
-              <option value="PM">PM</option>
-            </select>
-          </div>
-          <textarea id="description" placeholder="Description" required></textarea><br>
-          <input type="text" id="specials" placeholder="Specials (e.g., Taco Tuesday)" required><br>
-          <input type="file" id="photos" accept="image/*" multiple><br>
         </div>
         <button id="auth-submit">Submit</button>
         <p id="auth-toggle">Already have an account? <a href="#" onclick="toggleAuthMode()">Login</a></p>
