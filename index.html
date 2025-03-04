@@ -97,14 +97,24 @@
     #visited-trucks h3 { 
       color: #00d4ff; 
       font-size: 1.2em; 
+      margin-bottom: 10px; 
     }
     #visited-trucks ul { 
       list-style: none; 
       padding: 0; 
     }
     #visited-trucks li { 
-      padding: 5px 0; 
-      font-size: 0.9em; 
+      background: #222; 
+      padding: 8px; 
+      margin: 5px 0; 
+      border-radius: 4px; 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+    }
+    #visited-trucks .tier { 
+      font-size: 0.8em; 
+      color: #ff4081; 
     }
     #content { 
       flex: 1; 
@@ -349,7 +359,7 @@
       <button id="dashboard-btn" style="display: none;"><i class="fas fa-tachometer-alt"></i> <span>Dashboard</span></button>
       <button id="logout" style="display: none;"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></button>
       <div id="visited-trucks" style="display: none;">
-        <h3>Visited Trucks</h3>
+        <h3>Your Truck Rankings</h3>
         <ul id="visited-list"></ul>
       </div>
     </div>
@@ -450,7 +460,7 @@
       <p id="page-description"></p>
       <p id="page-specials"></p>
       <div id="page-photos"></div>
-      <!-- Rating and Share buttons added dynamically in JS -->
+      <div id="business-actions"></div>
       <button id="close-page" onclick="closeBusinessPage()">Close</button>
     </div>
   </div>
