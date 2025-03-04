@@ -234,6 +234,8 @@ async function toggleLiveStatus(userId, isLive) {
     await db.collection('pins').doc(userId).set({
       ...userData,
       live: true,
+      latitude: userData.latitude,
+      longitude: userData.longitude,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     console.log("Vendor went live:", userId);
@@ -328,7 +330,6 @@ function loadPins() {
     updateTruckList();
   });
 
-  // Populate food type filter
   db.collection('pins').get().then(snapshot => {
     const foodTypes = [...new Set(snapshot.docs.map(doc => doc.data().foodType))];
     foodTypes.forEach(type => {
@@ -362,7 +363,14 @@ function updateTruckList() {
 
   const truckList = document.getElementById('truck-list');
   truckList.innerHTML = '';
+  console.log("Filtered pins for truck list:", filteredPins);
+
   filteredPins.forEach(pin => {
+    if (!pin.startTime || !pin.endTime || !pin.startPeriod || !pin.endPeriod) {
+      console.log(`Skipping ${pin.name} due to missing time fields:`, pin);
+      return; // Skip this pin if time data is incomplete
+    }
+
     const now = new Date();
     let currentHours = now.getHours() + now.getMinutes() / 60;
     let startHours = parseInt(pin.startTime.split(':')[0]) + parseInt(pin.startTime.split(':')[1]) / 60;
@@ -371,6 +379,8 @@ function updateTruckList() {
     if (pin.startPeriod === 'AM' && startHours === 12) startHours = 0;
     if (pin.endPeriod === 'PM' && endHours < 12) endHours += 12;
     if (pin.endPeriod === 'AM' && endHours === 12) endHours = 0;
+
+    console.log(`Checking ${pin.name}: Now=${currentHours}, Start=${startHours}, End=${endHours}`);
 
     if (currentHours >= startHours && currentHours <= endHours) {
       const card = document.createElement('div');
@@ -381,18 +391,24 @@ function updateTruckList() {
       `;
       card.onclick = () => showBusinessPage(pin);
       truckList.appendChild(card);
+    } else {
+      console.log(`${pin.name} excluded from list due to hours`);
     }
   });
 
   clusterGroup.clearLayers();
   filteredPins.forEach(pin => {
     if (pin.latitude && pin.longitude) {
+      console.log(`Adding marker for ${pin.name} at ${pin.latitude}, ${pin.longitude}`);
       const marker = L.marker([pin.latitude, pin.longitude], { icon: foodTruckIcon })
         .bindPopup(`<b>${pin.name}</b><br>${pin.description}`)
         .on('click', () => showBusinessPage(pin));
       clusterGroup.addLayer(marker);
+    } else {
+      console.log(`No valid coords for ${pin.name}: lat=${pin.latitude}, lng=${pin.longitude}`);
     }
   });
+  map.fitBounds(clusterGroup.getBounds().pad(0.1));
 }
 
 truckSearch.oninput = debounce(updateTruckList, 300);
