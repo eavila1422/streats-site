@@ -212,6 +212,9 @@ if (authSubmit) {
         console.log("Vendor signed up:", user.uid);
       } else {
         userData.visitedTrucks = {};
+        userData.points = 0;
+        userData.badges = [];
+        userData.coupons = {};
         await db.collection('customers').doc(user.uid).set(userData);
         console.log("Customer signed up:", user.uid);
       }
@@ -261,6 +264,7 @@ auth.onAuthStateChanged(async user => {
       if (!vendorDoc.exists) document.getElementById('sidebar-name').textContent = customerData.name;
       document.getElementById('sidebar-status').textContent += vendorDoc.exists ? " | Foodie" : "Foodie";
       loadVisitedTrucks(user.uid);
+      loadTruckTrek(user.uid);
     }
   } else {
     vendorAuthBtn.style.display = 'block';
@@ -269,6 +273,7 @@ auth.onAuthStateChanged(async user => {
     logoutBtn.style.display = 'none';
     dashboard.style.display = 'none';
     document.getElementById('visited-trucks').style.display = 'none';
+    document.getElementById('truck-trek').style.display = 'none';
     document.getElementById('sidebar-name').textContent = '';
     document.getElementById('sidebar-status').textContent = '';
   }
@@ -382,9 +387,16 @@ if (logoutBtn) {
   };
 }
 
-function loadPins() {
-  db.collection('pins').onSnapshot(snapshot => {
+async function loadPins() {
+  db.collection('pins').onSnapshot(async snapshot => {
     allPins = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    for (let pin of allPins) {
+      const ratings = await db.collection('ratings').where('pinId', '==', pin.id).get();
+      const ratingCount = ratings.size;
+      const avgRating = ratingCount ? ratings.docs.reduce((sum, doc) => sum + doc.data().rating, 0) / ratingCount : 0;
+      pin.ratingCount = ratingCount;
+      pin.avgRating = avgRating.toFixed(1);
+    }
     updateTruckList();
   });
 
@@ -446,6 +458,7 @@ function updateTruckList() {
       card.innerHTML = `
         <h3>${pin.name}</h3>
         <p>${pin.foodType} • ${pin.live ? 'Live Now' : 'Offline'}</p>
+        <p class="rating-info">${pin.avgRating || 'No'} ★ (${pin.ratingCount || 0} reviews)</p>
       `;
       card.onclick = () => showBusinessPage(pin);
       truckList.appendChild(card);
@@ -459,7 +472,7 @@ function updateTruckList() {
     if (pin.latitude && pin.longitude) {
       console.log(`Adding marker for ${pin.name} at ${pin.latitude}, ${pin.longitude}`);
       const marker = L.marker([pin.latitude, pin.longitude], { icon: foodTruckIcon })
-        .bindPopup(`<b>${pin.name}</b><br>${pin.description}`)
+        .bindPopup(`<b>${pin.name}</b><br>${pin.description}<br>${pin.avgRating || 'No'} ★ (${pin.ratingCount || 0} reviews)`)
         .on('click', () => showBusinessPage(pin));
       clusterGroup.addLayer(marker);
     } else {
@@ -475,7 +488,7 @@ truckSearch.oninput = debounce(updateTruckList, 300);
 foodTypeFilter.onchange = updateTruckList;
 statusFilter.onchange = updateTruckList;
 
-// Business page with ratings only
+// Business page with ratings and reviews
 async function showBusinessPage(pin) {
   const businessPage = document.getElementById('business-page');
   const businessActions = document.getElementById('business-actions');
@@ -497,7 +510,6 @@ async function showBusinessPage(pin) {
     });
   }
   
-  // Clear previous actions and add new ones
   businessActions.innerHTML = `
     <div class="rating">
       <label>Rate:</label>
@@ -508,6 +520,7 @@ async function showBusinessPage(pin) {
         <option value="4">4</option>
         <option value="5">5</option>
       </select>
+      <textarea id="comment" placeholder="Leave a comment about your visit"></textarea>
       <button id="submit-rating">Submit</button>
     </div>
     <button onclick="markVisited('${pin.id}')">Mark as Visited</button>
@@ -527,7 +540,8 @@ async function showBusinessPage(pin) {
       const existingReview = await db.collection('ratings').where('pinId', '==', pin.id).where('userId', '==', userId).get();
       if (!existingReview.empty) {
         submitBtn.disabled = true;
-        submitBtn.textContent = "Already Rated";
+        submitBtn.textContent = "See What Others Are Saying";
+        submitBtn.onclick = () => showReviews(pin);
       } else {
         submitBtn.onclick = () => submitRating(pin.id);
       }
@@ -557,21 +571,49 @@ async function submitRating(pinId) {
     return;
   }
   const rating = document.getElementById('rating').value;
+  const comment = document.getElementById('comment').value;
   try {
     await db.collection('ratings').add({
       pinId,
       userId,
       rating: parseInt(rating),
+      comment: comment || "No comment provided.",
+      reviewerName: customerDoc.data().name,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     console.log("Rating submitted for pin:", pinId);
     alert("Rating submitted successfully!");
     document.getElementById('submit-rating').disabled = true;
-    document.getElementById('submit-rating').textContent = "Already Rated";
+    document.getElementById('submit-rating').textContent = "See What Others Are Saying";
+    document.getElementById('submit-rating').onclick = () => showReviews({ id: pinId, name: document.getElementById('page-name').textContent });
   } catch (error) {
     console.error("Rating submission failed:", error);
     alert("Error submitting rating: " + error.message);
   }
+}
+
+async function showReviews(pin) {
+  const reviewsModal = document.getElementById('reviews-modal');
+  const reviewList = document.getElementById('review-list');
+  document.getElementById('review-truck-name').textContent = pin.name;
+  reviewList.innerHTML = '';
+
+  const reviews = await db.collection('ratings').where('pinId', '==', pin.id).orderBy('createdAt', 'desc').get();
+  if (reviews.empty) {
+    reviewList.innerHTML = '<p>No reviews yet.</p>';
+  } else {
+    reviews.forEach(doc => {
+      const data = doc.data();
+      const reviewDiv = document.createElement('div');
+      reviewDiv.className = 'review';
+      reviewDiv.innerHTML = `
+        <p><span class="rating-score">${data.rating} ★</span> by ${data.reviewerName}</p>
+        <p>${data.comment}</p>
+      `;
+      reviewList.appendChild(reviewDiv);
+    });
+  }
+  reviewsModal.style.display = 'block';
 }
 
 async function markVisited(pinId) {
@@ -587,11 +629,28 @@ async function markVisited(pinId) {
   }
   const visitedTrucks = customerDoc.data().visitedTrucks || {};
   visitedTrucks[pinId] = (visitedTrucks[pinId] || 0) + 1;
+  const points = customerDoc.data().points || 0;
+  const newPoints = points + (visitedTrucks[pinId] === 1 ? 10 : 0); // 10 points for first visit only
+  let badges = customerDoc.data().badges || [];
+  const totalVisits = Object.values(visitedTrucks).reduce((sum, count) => sum + count, 0);
+  if (totalVisits >= 30 && !badges.includes("Foodie Legend")) badges.push("Foodie Legend");
+  else if (totalVisits >= 15 && !badges.includes("Street Food Star")) badges.push("Street Food Star");
+  else if (totalVisits >= 5 && !badges.includes("Truck Tracker")) badges.push("Truck Tracker");
+
+  let coupons = customerDoc.data().coupons || {};
+  if (totalVisits >= 15 && !coupons[pinId]) {
+    coupons[pinId] = { redeemed: false, offer: "10% off next visit" };
+  }
+
   await db.collection('customers').doc(userId).update({
-    visitedTrucks: visitedTrucks
+    visitedTrucks,
+    points: newPoints,
+    badges,
+    coupons
   });
   console.log("Truck marked as visited:", pinId);
   loadVisitedTrucks(userId);
+  loadTruckTrek(userId);
 }
 
 async function loadVisitedTrucks(userId) {
@@ -600,7 +659,7 @@ async function loadVisitedTrucks(userId) {
   const visitedTrucks = customerDoc.data().visitedTrucks || {};
   const visitedList = document.getElementById('visited-list');
   visitedList.innerHTML = '';
-  const truckEntries = Object.entries(visitedTrucks).sort((a, b) => b[1] - a[1]); // Sort by visit count
+  const truckEntries = Object.entries(visitedTrucks).sort((a, b) => b[1] - a[1]);
   if (truckEntries.length > 0) {
     document.getElementById('visited-trucks').style.display = 'block';
     for (const [pinId, count] of truckEntries) {
@@ -615,6 +674,17 @@ async function loadVisitedTrucks(userId) {
   } else {
     document.getElementById('visited-trucks').style.display = 'none';
   }
+}
+
+async function loadTruckTrek(userId) {
+  const customerDoc = await db.collection('customers').doc(userId).get();
+  if (!customerDoc.exists) return;
+  const points = customerDoc.data().points || 0;
+  const badges = customerDoc.data().badges || [];
+  const truckTrek = document.getElementById('truck-trek');
+  truckTrek.style.display = 'block';
+  document.getElementById('trek-points').textContent = points;
+  document.getElementById('trek-badge').textContent = badges.length > 0 ? badges[badges.length - 1] : "Newbie";
 }
 
 async function uploadPhotos(files, pinId) {
