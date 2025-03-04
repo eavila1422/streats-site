@@ -9,8 +9,6 @@ const firebaseConfig = {
   appId: "1:435856449927:web:021d6dae14a84320627322",
 };
 
-const MAPBOX_TOKEN = 'pk.eyJ1IjoiZWF2aWxhMTQyMiIsImEiOiJjbTdpMjZsYngwY2IxMm1vaWtjM3ZieGRmIn0.C9ja6tcQ-iNu91gSDggyxg'; // REPLACE THIS WITH YOUR MAPBOX TOKEN
-
 let db, storage, auth;
 if (typeof firebase !== 'undefined') {
   try {
@@ -24,7 +22,7 @@ if (typeof firebase !== 'undefined') {
   }
 }
 
-// Initialize Leaflet map with clustering
+// Initialize Leaflet map with OpenStreetMap
 console.log("Attempting to load map...");
 let map, clusterGroup = L.markerClusterGroup();
 const foodTruckIcon = L.icon({
@@ -37,20 +35,16 @@ navigator.geolocation.getCurrentPosition(position => {
   const { latitude, longitude } = position.coords;
   console.log("Geolocation success:", latitude, longitude);
   map = L.map('map').setView([latitude, longitude], 13);
-  L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/dark-v10/tiles/{z}/{x}/{y}?access_token=' + MAPBOX_TOKEN, {
-    attribution: '© <a href="https://www.mapbox.com/">Mapbox</a> © <a href="https://www.openstreetmap.org/">OpenStreetMap</a>',
-    tileSize: 512,
-    zoomOffset: -1
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
   }).addTo(map);
   map.addLayer(clusterGroup);
   loadPins();
 }, () => {
   console.log("Geolocation failed, using fallback location");
   map = L.map('map').setView([51.505, -0.09], 13);
-  L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/dark-v10/tiles/{z}/{x}/{y}?access_token=' + MAPBOX_TOKEN, {
-    attribution: '© <a href="https://www.mapbox.com/">Mapbox</a> © <a href="https://www.openstreetmap.org/">OpenStreetMap</a>',
-    tileSize: 512,
-    zoomOffset: -1
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
   }).addTo(map);
   map.addLayer(clusterGroup);
   loadPins();
@@ -366,9 +360,10 @@ function updateTruckList() {
   console.log("Filtered pins for truck list:", filteredPins);
 
   filteredPins.forEach(pin => {
+    // Check for required time fields, skip if missing
     if (!pin.startTime || !pin.endTime || !pin.startPeriod || !pin.endPeriod) {
-      console.log(`Skipping ${pin.name} due to missing time fields:`, pin);
-      return; // Skip this pin if time data is incomplete
+      console.log(`Skipping ${pin.name || 'unnamed pin'} due to missing time fields:`, pin);
+      return;
     }
 
     const now = new Date();
@@ -408,7 +403,9 @@ function updateTruckList() {
       console.log(`No valid coords for ${pin.name}: lat=${pin.latitude}, lng=${pin.longitude}`);
     }
   });
-  map.fitBounds(clusterGroup.getBounds().pad(0.1));
+  if (clusterGroup.getLayers().length > 0) {
+    map.fitBounds(clusterGroup.getBounds().pad(0.1));
+  }
 }
 
 truckSearch.oninput = debounce(updateTruckList, 300);
