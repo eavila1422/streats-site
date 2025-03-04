@@ -169,46 +169,51 @@ if (authSubmit) {
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     try {
+      let user;
       if (isSignupMode) {
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        const user = userCredential.user;
-        const userData = {
-          email,
-          name: document.getElementById('name').value,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-
-        if (authType === 'vendor') {
-          const place = signupAutocomplete.getPlace();
-          if (!place || !place.geometry) throw new Error("Please select an address from the dropdown");
-          const address = place.formatted_address;
-          const coords = { latitude: place.geometry.location.lat(), longitude: place.geometry.location.lng() };
-          Object.assign(userData, {
-            foodType: document.getElementById('foodType').value,
-            contact: document.getElementById('contact').value,
-            description: document.getElementById('description').value,
-            address,
-            latitude: coords.latitude,
-            longitude: coords.longitude,
-            startTime: document.getElementById('startTime').value,
-            startPeriod: document.getElementById('startPeriod').value,
-            endTime: document.getElementById('endTime').value,
-            endPeriod: document.getElementById('endPeriod').value,
-            specials: document.getElementById('specials').value,
-            approved: false,
-            productPhotos: []
-          });
-          await db.collection('vendors').doc(user.uid).set(userData);
-          await uploadInitialPhotos(user.uid);
-          console.log("Vendor signed up:", user.uid);
-        } else {
-          userData.visitedTrucks = [];
-          await db.collection('customers').doc(user.uid).set(userData);
-          console.log("Customer signed up:", user.uid);
-        }
+        user = userCredential.user;
       } else {
-        await auth.signInWithEmailAndPassword(email, password);
-        console.log("User logged in:", auth.currentUser.uid);
+        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+        user = userCredential.user;
+        console.log("User logged in:", user.uid);
+        authModal.style.display = 'none';
+        return;
+      }
+
+      const userData = {
+        email,
+        name: document.getElementById('name').value,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+
+      if (authType === 'vendor') {
+        const place = signupAutocomplete.getPlace();
+        if (!place || !place.geometry) throw new Error("Please select an address from the dropdown");
+        const address = place.formatted_address;
+        const coords = { latitude: place.geometry.location.lat(), longitude: place.geometry.location.lng() };
+        Object.assign(userData, {
+          foodType: document.getElementById('foodType').value,
+          contact: document.getElementById('contact').value,
+          description: document.getElementById('description').value,
+          address,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          startTime: document.getElementById('startTime').value,
+          startPeriod: document.getElementById('startPeriod').value,
+          endTime: document.getElementById('endTime').value,
+          endPeriod: document.getElementById('endPeriod').value,
+          specials: document.getElementById('specials').value,
+          approved: false,
+          productPhotos: []
+        });
+        await db.collection('vendors').doc(user.uid).set(userData);
+        await uploadInitialPhotos(user.uid);
+        console.log("Vendor signed up:", user.uid);
+      } else {
+        userData.visitedTrucks = {};
+        await db.collection('customers').doc(user.uid).set(userData);
+        console.log("Customer signed up:", user.uid);
       }
       authModal.style.display = 'none';
     } catch (error) {
@@ -250,11 +255,11 @@ auth.onAuthStateChanged(async user => {
       } else {
         dashboardBtn.style.display = 'none';
       }
-    } else if (customerDoc.exists) {
+    }
+    if (customerDoc.exists) {
       const customerData = customerDoc.data();
-      document.getElementById('sidebar-name').textContent = customerData.name;
-      document.getElementById('sidebar-status').textContent = "Foodie";
-      dashboardBtn.style.display = 'none';
+      if (!vendorDoc.exists) document.getElementById('sidebar-name').textContent = customerData.name;
+      document.getElementById('sidebar-status').textContent += vendorDoc.exists ? " | Foodie" : "Foodie";
       loadVisitedTrucks(user.uid);
     }
   } else {
@@ -470,8 +475,10 @@ truckSearch.oninput = debounce(updateTruckList, 300);
 foodTypeFilter.onchange = updateTruckList;
 statusFilter.onchange = updateTruckList;
 
-// Business page with ratings and sharing
+// Business page with ratings only
 async function showBusinessPage(pin) {
+  const businessPage = document.getElementById('business-page');
+  const businessActions = document.getElementById('business-actions');
   document.getElementById('page-name').textContent = pin.name;
   document.getElementById('page-foodType').textContent = `Food Type: ${pin.foodType}`;
   document.getElementById('page-contact').textContent = `Contact: ${pin.contact}`;
@@ -489,8 +496,9 @@ async function showBusinessPage(pin) {
       photosDiv.appendChild(img);
     });
   }
-  const businessPage = document.getElementById('business-page');
-  let ratingHTML = `
+  
+  // Clear previous actions and add new ones
+  businessActions.innerHTML = `
     <div class="rating">
       <label>Rate:</label>
       <select id="rating">
@@ -502,10 +510,6 @@ async function showBusinessPage(pin) {
       </select>
       <button id="submit-rating">Submit</button>
     </div>
-  `;
-  businessPage.innerHTML += `
-    ${ratingHTML}
-    <button onclick="shareOnX('${pin.name}')">Share on X</button>
     <button onclick="markVisited('${pin.id}')">Mark as Visited</button>
   `;
   
@@ -578,44 +582,39 @@ async function markVisited(pinId) {
   const userId = auth.currentUser.uid;
   const customerDoc = await db.collection('customers').doc(userId).get();
   if (!customerDoc.exists) {
-    alert("Only customers can mark visits.");
+    alert("Only customers can mark visits. Create a customer account.");
     return;
   }
-  const visitedTrucks = customerDoc.data().visitedTrucks || [];
-  if (!visitedTrucks.includes(pinId)) {
-    visitedTrucks.push(pinId);
-    await db.collection('customers').doc(userId).update({
-      visitedTrucks: visitedTrucks
-    });
-    console.log("Truck marked as visited:", pinId);
-    loadVisitedTrucks(userId);
-  }
+  const visitedTrucks = customerDoc.data().visitedTrucks || {};
+  visitedTrucks[pinId] = (visitedTrucks[pinId] || 0) + 1;
+  await db.collection('customers').doc(userId).update({
+    visitedTrucks: visitedTrucks
+  });
+  console.log("Truck marked as visited:", pinId);
+  loadVisitedTrucks(userId);
 }
 
 async function loadVisitedTrucks(userId) {
   const customerDoc = await db.collection('customers').doc(userId).get();
   if (!customerDoc.exists) return;
-  const visitedTrucks = customerDoc.data().visitedTrucks || [];
+  const visitedTrucks = customerDoc.data().visitedTrucks || {};
   const visitedList = document.getElementById('visited-list');
   visitedList.innerHTML = '';
-  if (visitedTrucks.length > 0) {
+  const truckEntries = Object.entries(visitedTrucks).sort((a, b) => b[1] - a[1]); // Sort by visit count
+  if (truckEntries.length > 0) {
     document.getElementById('visited-trucks').style.display = 'block';
-    for (const pinId of visitedTrucks) {
+    for (const [pinId, count] of truckEntries) {
       const pinDoc = await db.collection('pins').doc(pinId).get();
       if (pinDoc.exists) {
         const li = document.createElement('li');
-        li.textContent = pinDoc.data().name;
+        const tier = count >= 5 ? "Foodie Legend" : count >= 3 ? "Explorer" : "Newbie";
+        li.innerHTML = `${pinDoc.data().name} (${count} visits) <span class="tier">${tier}</span>`;
         visitedList.appendChild(li);
       }
     }
   } else {
     document.getElementById('visited-trucks').style.display = 'none';
   }
-}
-
-function shareOnX(name) {
-  const url = window.location.href;
-  window.open(`https://x.com/intent/tweet?text=Check out ${name} on Streats Live!&url=${url}`, '_blank');
 }
 
 async function uploadPhotos(files, pinId) {
