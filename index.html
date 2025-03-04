@@ -344,7 +344,8 @@
         <h2 id="sidebar-name"></h2>
         <p id="sidebar-status"></p>
       </div>
-      <button id="auth-btn"><i class="fas fa-user"></i> <span>Sign Up / Login</span></button>
+      <button id="vendor-auth-btn"><i class="fas fa-truck"></i> <span>Put My Truck on the Map</span></button>
+      <button id="customer-auth-btn"><i class="fas fa-utensils"></i> <span>Join the Foodie Frenzy!</span></button>
       <button id="dashboard-btn" style="display: none;"><i class="fas fa-tachometer-alt"></i> <span>Dashboard</span></button>
       <button id="logout" style="display: none;"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></button>
       <div id="visited-trucks" style="display: none;">
@@ -379,10 +380,6 @@
         <input type="password" id="password" placeholder="Password" required><br>
         <div id="signup-fields" style="display: none;">
           <input type="text" id="name" placeholder="Name (Customer) or Business Name (Vendor)" required><br>
-          <select id="user-type" required>
-            <option value="customer">Customer</option>
-            <option value="vendor">Vendor</option>
-          </select><br>
           <div id="vendor-fields" style="display: none;">
             <input type="text" id="foodType" placeholder="Food Type (e.g., Tacos)" required><br>
             <input type="text" id="contact" placeholder="Contact Info" required><br>
