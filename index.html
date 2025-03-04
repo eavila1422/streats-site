@@ -116,6 +116,22 @@
       font-size: 0.8em; 
       color: #ff4081; 
     }
+    #truck-trek { 
+      margin-top: 20px; 
+      text-align: center; 
+    }
+    #truck-trek p { 
+      margin: 5px 0; 
+      font-size: 0.9em; 
+    }
+    #truck-trek .points { 
+      color: #00d4ff; 
+      font-weight: bold; 
+    }
+    #truck-trek .badge { 
+      color: #ff4081; 
+      font-style: italic; 
+    }
     #content { 
       flex: 1; 
       padding: 20px; 
@@ -201,7 +217,11 @@
     .truck-card.live { 
       border: 2px solid #00d4ff; 
     }
-    #auth-modal, #dashboard { 
+    .truck-card .rating-info { 
+      font-size: 0.8em; 
+      color: #ff4081; 
+    }
+    #auth-modal, #dashboard, #reviews-modal { 
       display: none; 
       background: #171717; 
       padding: 30px; 
@@ -210,12 +230,17 @@
       max-width: 600px; 
       margin: 0 auto 20px; 
       animation: slideIn 0.3s ease; 
+      position: fixed; 
+      top: 50%; 
+      left: 50%; 
+      transform: translate(-50%, -50%); 
+      z-index: 1000; 
     }
     @keyframes slideIn { 
-      from { opacity: 0; transform: translateY(10px); } 
-      to { opacity: 1; transform: translateY(0); } 
+      from { opacity: 0; transform: translate(-50%, -60%); } 
+      to { opacity: 1; transform: translate(-50%, -50%); } 
     }
-    #auth-modal input, #dashboard input, #dashboard textarea, #dashboard select { 
+    #auth-modal input, #dashboard input, #dashboard textarea, #dashboard select, #reviews-modal textarea { 
       width: 100%; 
       padding: 10px; 
       margin: 6px 0; 
@@ -226,15 +251,15 @@
       font-size: 0.9em; 
       transition: border-color 0.2s; 
     }
-    #auth-modal input:focus, #dashboard input:focus, #dashboard textarea:focus, #dashboard select:focus { 
+    #auth-modal input:focus, #dashboard input:focus, #dashboard textarea:focus, #dashboard select:focus, #reviews-modal textarea:focus { 
       border-color: #00d4ff; 
       outline: none; 
     }
-    #dashboard textarea { 
+    #dashboard textarea, #reviews-modal textarea { 
       height: 90px; 
       resize: vertical; 
     }
-    #auth-modal button, #dashboard button { 
+    #auth-modal button, #dashboard button, #reviews-modal button { 
       background: #00d4ff; 
       color: #0f0f0f; 
       border: none; 
@@ -246,7 +271,7 @@
       margin-top: 6px; 
       transition: background 0.2s, transform 0.1s; 
     }
-    #auth-modal button:hover, #dashboard button:hover { 
+    #auth-modal button:hover, #dashboard button:hover, #reviews-modal button:hover { 
       background: #ff4081; 
       transform: translateY(-1px); 
     }
@@ -316,6 +341,17 @@
     #business-page button:hover { 
       background: #ff4081; 
     }
+    #reviews-modal .review { 
+      border-bottom: 1px solid #2a2a2a; 
+      padding: 10px 0; 
+    }
+    #reviews-modal .review:last-child { 
+      border-bottom: none; 
+    }
+    #reviews-modal .rating-score { 
+      color: #ff4081; 
+      font-weight: bold; 
+    }
     #about { 
       background: #171717; 
       padding: 30px; 
@@ -361,6 +397,10 @@
       <div id="visited-trucks" style="display: none;">
         <h3>Your Truck Rankings</h3>
         <ul id="visited-list"></ul>
+      </div>
+      <div id="truck-trek" style="display: none;">
+        <p><span class="points" id="trek-points">0</span> Points</p>
+        <p>Badge: <span class="badge" id="trek-badge">Newbie</span></p>
       </div>
     </div>
     <div id="content" class="full">
@@ -444,11 +484,10 @@
         <button id="update-profile">Update Profile</button>
         <button id="live-toggle">Go Live</button>
       </div>
-      <div id="about">
-        <h2>About Streats Live</h2>
-        <p>Connecting food lovers with local food trucks in real-time.</p>
-        <p><strong>Goals:</strong> Empower vendors, boost local cuisine.</p>
-        <p><strong>Team:</strong> Foodies and tech innovators.</p>
+      <div id="reviews-modal">
+        <h2>Reviews for <span id="review-truck-name"></span></h2>
+        <div id="review-list"></div>
+        <button id="close-reviews" onclick="document.getElementById('reviews-modal').style.display = 'none'">Close</button>
       </div>
     </div>
     <div id="business-page">
