@@ -1,442 +1,479 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Streats Live</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
-  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-  <style>
-    body { 
-      margin: 0; 
-      font-family: 'Inter', sans-serif; 
-      background: #0f0f0f; 
-      color: #d4d4d4; 
-      overflow-x: hidden; 
+console.log("Script.js loaded at:", new Date().toLocaleString());
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDFRyLHLDumJpteFlannZMcEX3l8VpuQlM",
+  authDomain: "streats-site.firebaseapp.com",
+  projectId: "streats-site",
+  storageBucket: "streats-site.firebasestorage.app",
+  messagingSenderId: "435856449927",
+  appId: "1:435856449927:web:021d6dae14a84320627322",
+};
+
+const MAPBOX_TOKEN = 'pk.eyJ1IjoiZWF2aWxhMTQyMiIsImEiOiJjbTdpMjZsYngwY2IxMm1vaWtjM3ZieGRmIn0.C9ja6tcQ-iNu91gSDggyxg'; // REPLACE THIS WITH YOUR MAPBOX TOKEN
+
+let db, storage, auth;
+if (typeof firebase !== 'undefined') {
+  try {
+    firebase.initializeApp(firebaseConfig);
+    console.log("Firebase initialized successfully");
+    db = firebase.firestore();
+    storage = firebase.storage();
+    auth = firebase.auth();
+  } catch (error) {
+    console.error("Firebase initialization failed:", error);
+  }
+}
+
+// Initialize Leaflet map with clustering
+console.log("Attempting to load map...");
+let map, clusterGroup = L.markerClusterGroup();
+const foodTruckIcon = L.icon({
+  iconUrl: 'https://cdn-icons-png.flaticon.com/512/1048/1048313.png',
+  iconSize: [38, 38],
+  iconAnchor: [19, 38],
+  popupAnchor: [0, -38]
+});
+navigator.geolocation.getCurrentPosition(position => {
+  const { latitude, longitude } = position.coords;
+  console.log("Geolocation success:", latitude, longitude);
+  map = L.map('map').setView([latitude, longitude], 13);
+  L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/dark-v10/tiles/{z}/{x}/{y}?access_token=' + MAPBOX_TOKEN, {
+    attribution: '© <a href="https://www.mapbox.com/">Mapbox</a> © <a href="https://www.openstreetmap.org/">OpenStreetMap</a>',
+    tileSize: 512,
+    zoomOffset: -1
+  }).addTo(map);
+  map.addLayer(clusterGroup);
+  loadPins();
+}, () => {
+  console.log("Geolocation failed, using fallback location");
+  map = L.map('map').setView([51.505, -0.09], 13);
+  L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/dark-v10/tiles/{z}/{x}/{y}?access_token=' + MAPBOX_TOKEN, {
+    attribution: '© <a href="https://www.mapbox.com/">Mapbox</a> © <a href="https://www.openstreetmap.org/">OpenStreetMap</a>',
+    tileSize: 512,
+    zoomOffset: -1
+  }).addTo(map);
+  map.addLayer(clusterGroup);
+  loadPins();
+});
+
+// Sidebar toggle
+const sidebar = document.getElementById('sidebar');
+const sidebarToggle = document.getElementById('sidebar-toggle');
+const content = document.getElementById('content');
+sidebarToggle.onclick = () => {
+  sidebar.classList.toggle('hidden');
+  content.classList.toggle('full');
+  sidebarToggle.classList.toggle('hidden');
+};
+
+// Authentication handling
+const authBtn = document.getElementById('auth-btn');
+const authModal = document.getElementById('auth-modal');
+const authTitle = document.getElementById('auth-title');
+const signupFields = document.getElementById('signup-fields');
+const authSubmit = document.getElementById('auth-submit');
+const authToggle = document.getElementById('auth-toggle');
+const dashboard = document.getElementById('dashboard');
+const dashboardBtn = document.getElementById('dashboard-btn');
+const logoutBtn = document.getElementById('logout');
+const updateProfileBtn = document.getElementById('update-profile');
+const liveToggle = document.getElementById('live-toggle');
+let isSignupMode = true;
+
+authBtn.onclick = () => {
+  authModal.style.display = 'block';
+  dashboard.style.display = 'none';
+  updateAuthMode();
+};
+
+function updateAuthMode() {
+  if (isSignupMode) {
+    authTitle.textContent = "Sign Up";
+    signupFields.style.display = 'block';
+    authSubmit.textContent = "Sign Up";
+    authToggle.innerHTML = 'Already have an account? <a href="#" onclick="toggleAuthMode()">Login</a>';
+  } else {
+    authTitle.textContent = "Login";
+    signupFields.style.display = 'none';
+    authSubmit.textContent = "Login";
+    authToggle.innerHTML = 'Need an account? <a href="#" onclick="toggleAuthMode()">Sign Up</a>';
+  }
+}
+
+function toggleAuthMode() {
+  isSignupMode = !isSignupMode;
+  updateAuthMode();
+  event.preventDefault();
+}
+
+// Autocomplete setup
+let signupAutocomplete, dashAutocomplete;
+function initializeSignUpAutocomplete() {
+  const input = document.getElementById('address');
+  if (!input) return;
+  signupAutocomplete = new google.maps.places.Autocomplete(input, {
+    types: ['address'],
+    componentRestrictions: { country: 'us' },
+    fields: ['formatted_address', 'geometry.location']
+  });
+  signupAutocomplete.addListener('place_changed', () => {
+    const place = signupAutocomplete.getPlace();
+    if (place.geometry) {
+      document.getElementById('address-preview').textContent = `Selected: ${place.formatted_address}`;
+      console.log("Sign-up address selected:", place.formatted_address, "Coords:", place.geometry.location.lat(), place.geometry.location.lng());
     }
-    .container { 
-      display: flex; 
-      min-height: 100vh; 
+  });
+}
+
+function initializeDashAutocomplete() {
+  const input = document.getElementById('dash-address');
+  if (!input) return;
+  dashAutocomplete = new google.maps.places.Autocomplete(input, {
+    types: ['address'],
+    componentRestrictions: { country: 'us' },
+    fields: ['formatted_address', 'geometry.location']
+  });
+  dashAutocomplete.addListener('place_changed', () => {
+    const place = dashAutocomplete.getPlace();
+    if (place.geometry) {
+      document.getElementById('dash-address-preview').textContent = `Selected: ${place.formatted_address}`;
+      console.log("Dashboard address selected:", place.formatted_address, "Coords:", place.geometry.location.lat(), place.geometry.location.lng());
     }
-    #sidebar { 
-      width: 250px; 
-      background: #171717; 
-      padding: 15px; 
-      transition: width 0.3s ease; 
-      position: fixed; 
-      height: 100%; 
-      z-index: 1000; 
+  });
+}
+
+initializeSignUpAutocomplete();
+
+authSubmit.onclick = async () => {
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  try {
+    if (isSignupMode) {
+      const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+      const user = userCredential.user;
+      const place = signupAutocomplete.getPlace();
+      if (!place || !place.geometry) throw new Error("Please select an address from the dropdown");
+      const address = place.formatted_address;
+      const coords = { latitude: place.geometry.location.lat(), longitude: place.geometry.location.lng() };
+      const userData = {
+        email,
+        name: document.getElementById('name').value,
+        foodType: document.getElementById('foodType').value,
+        contact: document.getElementById('contact').value,
+        description: document.getElementById('description').value,
+        address,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        startTime: document.getElementById('startTime').value,
+        startPeriod: document.getElementById('startPeriod').value,
+        endTime: document.getElementById('endTime').value,
+        endPeriod: document.getElementById('endPeriod').value,
+        specials: document.getElementById('specials').value,
+        approved: false,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        productPhotos: []
+      };
+      await db.collection('users').doc(user.uid).set(userData);
+      console.log("User signed up:", user.uid);
+      await uploadInitialPhotos(user.uid);
+    } else {
+      await auth.signInWithEmailAndPassword(email, password);
+      console.log("User logged in:", auth.currentUser.uid);
     }
-    #sidebar.hidden { 
-      width: 60px; 
+    authModal.style.display = 'none';
+  } catch (error) {
+    console.error("Auth failed:", error);
+    alert("Error: " + error.message);
+  }
+};
+
+async function uploadInitialPhotos(userId) {
+  const photos = document.getElementById('photos').files;
+  console.log("Uploading initial photos:", photos.length, "files detected");
+  if (photos.length > 0) {
+    const photoUrls = await uploadPhotos(photos, userId);
+    await db.collection('users').doc(userId).update({ productPhotos: photoUrls });
+    console.log("Initial product photos uploaded:", photoUrls);
+  }
+}
+
+auth.onAuthStateChanged(async user => {
+  if (user) {
+    authBtn.style.display = 'none';
+    dashboardBtn.style.display = 'block';
+    logoutBtn.style.display = 'block';
+    const userDoc = await db.collection('users').doc(user.uid).get();
+    if (userDoc.exists) {
+      const userData = userDoc.data();
+      document.getElementById('sidebar-name').textContent = userData.name;
+      document.getElementById('sidebar-status').textContent = userData.approved ? "Approved" : "Pending";
+      const pinDoc = await db.collection('pins').doc(user.uid).get();
+      const isLive = pinDoc.exists && pinDoc.data().live;
+      liveToggle.textContent = isLive ? "Go Offline" : "Go Live";
+      liveToggle.onclick = () => toggleLiveStatus(user.uid, isLive);
+      dashboardBtn.onclick = () => showDashboard(userData);
     }
-    #sidebar-toggle { 
-      position: fixed; 
-      top: 10px; 
-      left: 270px; 
-      background: transparent; 
-      color: #00d4ff; 
-      border: 1px solid #00d4ff; 
-      padding: 6px 10px; 
-      border-radius: 4px; 
-      cursor: pointer; 
-      z-index: 1001; 
-      transition: left 0.3s ease, background 0.2s; 
+  } else {
+    authBtn.style.display = 'block';
+    dashboardBtn.style.display = 'none';
+    logoutBtn.style.display = 'none';
+    dashboard.style.display = 'none';
+    document.getElementById('sidebar-name').textContent = '';
+    document.getElementById('sidebar-status').textContent = '';
+  }
+});
+
+async function toggleLiveStatus(userId, isLive) {
+  const userDoc = await db.collection('users').doc(userId).get();
+  const userData = userDoc.data();
+  if (isLive) {
+    await db.collection('pins').doc(userId).delete();
+    console.log("Vendor went offline:", userId);
+    liveToggle.textContent = "Go Live";
+  } else {
+    await db.collection('pins').doc(userId).set({
+      ...userData,
+      live: true,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    console.log("Vendor went live:", userId);
+    liveToggle.textContent = "Go Offline";
+  }
+}
+
+function showDashboard(userData) {
+  authModal.style.display = 'none';
+  dashboard.style.display = 'block';
+  document.getElementById('dash-name').value = userData.name || '';
+  document.getElementById('dash-foodType').value = userData.foodType || '';
+  document.getElementById('dash-contact').value = userData.contact || '';
+  document.getElementById('dash-address').value = userData.address || '';
+  document.getElementById('dash-startTime').value = userData.startTime || '';
+  document.getElementById('dash-startPeriod').value = userData.startPeriod || 'AM';
+  document.getElementById('dash-endTime').value = userData.endTime || '';
+  document.getElementById('dash-endPeriod').value = userData.endPeriod || 'PM';
+  document.getElementById('dash-description').value = userData.description || '';
+  document.getElementById('dash-specials').value = userData.specials || '';
+  initializeDashAutocomplete();
+}
+
+updateProfileBtn.onclick = async () => {
+  const userId = auth.currentUser.uid;
+  try {
+    const place = dashAutocomplete.getPlace();
+    let address = document.getElementById('dash-address').value;
+    let coords = { latitude: null, longitude: null };
+    if (place && place.geometry) {
+      address = place.formatted_address;
+      coords.latitude = place.geometry.location.lat();
+      coords.longitude = place.geometry.location.lng();
+    } else {
+      const existingData = (await db.collection('users').doc(userId).get()).data();
+      coords.latitude = existingData.latitude;
+      coords.longitude = existingData.longitude;
     }
-    #sidebar-toggle.hidden { 
-      left: 70px; 
+    const updatedData = {
+      name: document.getElementById('dash-name').value,
+      foodType: document.getElementById('dash-foodType').value,
+      contact: document.getElementById('dash-contact').value,
+      address,
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      startTime: document.getElementById('dash-startTime').value,
+      startPeriod: document.getElementById('dash-startPeriod').value,
+      endTime: document.getElementById('dash-endTime').value,
+      endPeriod: document.getElementById('dash-endPeriod').value,
+      specials: document.getElementById('dash-specials').value,
+      description: document.getElementById('dash-description').value,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    await db.collection('users').doc(userId).update(updatedData);
+    const photos = document.getElementById('dash-photos').files;
+    if (photos.length > 0) {
+      const photoUrls = await uploadPhotos(photos, userId);
+      await db.collection('users').doc(userId).update({
+        productPhotos: firebase.firestore.FieldValue.arrayUnion(...photoUrls)
+      });
+      const pinDoc = await db.collection('pins').doc(userId).get();
+      if (pinDoc.exists && pinDoc.data().live) {
+        await db.collection('pins').doc(userId).update({
+          productPhotos: firebase.firestore.FieldValue.arrayUnion(...photoUrls),
+          ...updatedData
+        });
+      }
     }
-    #sidebar-toggle:hover { 
-      background: #00d4ff; 
-      color: #0f0f0f; 
+    console.log("Profile updated for:", userId);
+    alert("Profile updated successfully!");
+  } catch (error) {
+    console.error("Profile update failed:", error);
+    alert("Error: " + error.message);
+  }
+};
+
+logoutBtn.onclick = async () => {
+  await auth.signOut();
+  console.log("User logged out");
+  dashboard.style.display = 'none';
+};
+
+// Search and Filter logic
+const truckSearch = document.getElementById('truck-search');
+const foodTypeFilter = document.getElementById('food-type-filter');
+const statusFilter = document.getElementById('status-filter');
+let allPins = [];
+
+function loadPins() {
+  db.collection('pins').onSnapshot(snapshot => {
+    allPins = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    updateTruckList();
+  });
+
+  // Populate food type filter
+  db.collection('pins').get().then(snapshot => {
+    const foodTypes = [...new Set(snapshot.docs.map(doc => doc.data().foodType))];
+    foodTypes.forEach(type => {
+      const option = document.createElement('option');
+      option.value = type;
+      option.textContent = type;
+      foodTypeFilter.appendChild(option);
+    });
+  });
+}
+
+function debounce(func, wait) {
+  let timeout;
+  return function (...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+}
+
+function updateTruckList() {
+  const searchQuery = truckSearch.value.toLowerCase();
+  const foodType = foodTypeFilter.value;
+  const status = statusFilter.value;
+
+  const filteredPins = allPins.filter(pin => {
+    const matchesSearch = pin.name.toLowerCase().includes(searchQuery) || pin.description.toLowerCase().includes(searchQuery);
+    const matchesFoodType = !foodType || pin.foodType === foodType;
+    const matchesStatus = !status || (status === 'live' ? pin.live : !pin.live);
+    return matchesSearch && matchesFoodType && matchesStatus;
+  });
+
+  const truckList = document.getElementById('truck-list');
+  truckList.innerHTML = '';
+  filteredPins.forEach(pin => {
+    const now = new Date();
+    let currentHours = now.getHours() + now.getMinutes() / 60;
+    let startHours = parseInt(pin.startTime.split(':')[0]) + parseInt(pin.startTime.split(':')[1]) / 60;
+    let endHours = parseInt(pin.endTime.split(':')[0]) + parseInt(pin.endTime.split(':')[1]) / 60;
+    if (pin.startPeriod === 'PM' && startHours < 12) startHours += 12;
+    if (pin.startPeriod === 'AM' && startHours === 12) startHours = 0;
+    if (pin.endPeriod === 'PM' && endHours < 12) endHours += 12;
+    if (pin.endPeriod === 'AM' && endHours === 12) endHours = 0;
+
+    if (currentHours >= startHours && currentHours <= endHours) {
+      const card = document.createElement('div');
+      card.className = `truck-card ${pin.live ? 'live' : ''}`;
+      card.innerHTML = `
+        <h3>${pin.name}</h3>
+        <p>${pin.foodType} • ${pin.live ? 'Live Now' : 'Offline'}</p>
+      `;
+      card.onclick = () => showBusinessPage(pin);
+      truckList.appendChild(card);
     }
-    #sidebar .user-info { 
-      text-align: center; 
-      margin-bottom: 20px; 
+  });
+
+  clusterGroup.clearLayers();
+  filteredPins.forEach(pin => {
+    if (pin.latitude && pin.longitude) {
+      const marker = L.marker([pin.latitude, pin.longitude], { icon: foodTruckIcon })
+        .bindPopup(`<b>${pin.name}</b><br>${pin.description}`)
+        .on('click', () => showBusinessPage(pin));
+      clusterGroup.addLayer(marker);
     }
-    #sidebar .user-info h2 { 
-      color: #00d4ff; 
-      font-size: 1.4em; 
-      margin: 8px 0; 
-      white-space: nowrap; 
-    }
-    #sidebar button { 
-      background: none; 
-      color: #d4d4d4; 
-      border: none; 
-      padding: 12px; 
-      width: 100%; 
-      text-align: left; 
-      border-radius: 4px; 
-      cursor: pointer; 
-      font-size: 0.95em; 
-      margin: 5px 0; 
-      transition: background 0.2s, color 0.2s; 
-      display: flex; 
-      align-items: center; 
-    }
-    #sidebar.hidden button { 
-      text-align: center; 
-      padding: 12px 0; 
-    }
-    #sidebar.hidden button span { 
-      display: none; 
-    }
-    #sidebar.hidden button i { 
-      margin: 0; 
-    }
-    #sidebar button:hover { 
-      background: #00d4ff; 
-      color: #0f0f0f; 
-    }
-    #content { 
-      flex: 1; 
-      padding: 20px; 
-      margin-left: 250px; 
-      transition: margin-left 0.3s ease; 
-    }
-    #content.full { 
-      margin-left: 60px; 
-    }
-    .hero { 
-      background: url('https://via.placeholder.com/1200x400?text=Food+Truck') no-repeat center/cover; 
-      height: 50vh; 
-      display: flex; 
-      align-items: center; 
-      justify-content: center; 
-      text-align: center; 
-      color: #fff; 
-      position: relative; 
-    }
-    .hero-content { 
-      background: rgba(0, 0, 0, 0.5); 
-      padding: 20px; 
-      border-radius: 8px; 
-    }
-    .hero h1 { 
-      color: #00d4ff; 
-      font-size: 2.5em; 
-      margin-bottom: 10px; 
-    }
-    .hero p { 
-      font-size: 1.2em; 
-    }
-    .hero button { 
-      background: #00d4ff; 
-      color: #0f0f0f; 
-      padding: 10px 20px; 
-      border: none; 
-      border-radius: 4px; 
-      cursor: pointer; 
-      margin-top: 10px; 
-    }
-    .hero button:hover { 
-      background: #ff4081; 
-    }
-    .search-filter { 
-      display: flex; 
-      gap: 10px; 
-      margin: 20px 0; 
-    }
-    .search-filter input, .search-filter select { 
-      padding: 8px; 
-      border: 1px solid #2a2a2a; 
-      border-radius: 4px; 
-      background: #222; 
-      color: #d4d4d4; 
-      flex: 1; 
-    }
-    #map { 
-      height: 60vh; 
-      width: 100%; 
-      border-radius: 8px; 
-      box-shadow: 0 0 8px rgba(0, 212, 255, 0.1); 
-      margin-bottom: 20px; 
-      background: #171717; 
-    }
-    #truck-list { 
-      display: grid; 
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
-      gap: 15px; 
-      max-height: 40vh; 
-      overflow-y: auto; 
-    }
-    .truck-card { 
-      background: #171717; 
-      padding: 15px; 
-      border-radius: 8px; 
-      cursor: pointer; 
-      transition: transform 0.2s; 
-    }
-    .truck-card:hover { 
-      transform: scale(1.02); 
-    }
-    .truck-card.live { 
-      border: 2px solid #00d4ff; 
-    }
-    #auth-modal, #dashboard { 
-      display: none; 
-      background: #171717; 
-      padding: 30px; 
-      border-radius: 8px; 
-      box-shadow: 0 0 12px rgba(0, 212, 255, 0.15); 
-      max-width: 600px; 
-      margin: 0 auto 20px; 
-      animation: slideIn 0.3s ease; 
-    }
-    @keyframes slideIn { 
-      from { opacity: 0; transform: translateY(10px); } 
-      to { opacity: 1; transform: translateY(0); } 
-    }
-    #auth-modal input, #dashboard input, #dashboard textarea, #dashboard select { 
-      width: 100%; 
-      padding: 10px; 
-      margin: 6px 0; 
-      border: 1px solid #2a2a2a; 
-      border-radius: 4px; 
-      background: #222; 
-      color: #d4d4d4; 
-      font-size: 0.9em; 
-      transition: border-color 0.2s; 
-    }
-    #auth-modal input:focus, #dashboard input:focus, #dashboard textarea:focus, #dashboard select:focus { 
-      border-color: #00d4ff; 
-      outline: none; 
-    }
-    #dashboard textarea { 
-      height: 90px; 
-      resize: vertical; 
-    }
-    #auth-modal button, #dashboard button { 
-      background: #00d4ff; 
-      color: #0f0f0f; 
-      border: none; 
-      padding: 10px; 
-      width: 100%; 
-      border-radius: 4px; 
-      cursor: pointer; 
-      font-size: 0.95em; 
-      margin-top: 6px; 
-      transition: background 0.2s, transform 0.1s; 
-    }
-    #auth-modal button:hover, #dashboard button:hover { 
-      background: #ff4081; 
-      transform: translateY(-1px); 
-    }
-    .time-group { 
-      display: flex; 
-      gap: 6px; 
-    }
-    .time-group input { 
-      width: 65%; 
-    }
-    .time-group select { 
-      width: 35%; 
-    }
-    #address-preview, #dash-address-preview { 
-      font-size: 0.8em; 
-      color: #00d4ff; 
-      margin-top: 4px; 
-    }
-    #business-page { 
-      display: none; 
-      position: fixed; 
-      top: 50%; 
-      left: 50%; 
-      transform: translate(-50%, -50%); 
-      background: #171717; 
-      padding: 30px; 
-      border-radius: 8px; 
-      box-shadow: 0 0 12px rgba(0, 212, 255, 0.15); 
-      max-width: 700px; 
-      z-index: 1000; 
-      animation: slideIn 0.3s ease; 
-    }
-    #business-page h2 { 
-      color: #00d4ff; 
-      margin-bottom: 12px; 
-    }
-    #business-page p { 
-      margin: 6px 0; 
-      font-size: 0.95em; 
-    }
-    #business-page img { 
-      max-width: 100%; 
-      border-radius: 4px; 
-      margin: 8px 0; 
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2); 
-    }
-    #business-page .rating { 
-      margin: 10px 0; 
-    }
-    #business-page .rating select { 
-      padding: 5px; 
-      background: #222; 
-      color: #d4d4d4; 
-      border: 1px solid #2a2a2a; 
-      border-radius: 4px; 
-    }
-    #business-page button { 
-      background: #00d4ff; 
-      color: #0f0f0f; 
-      border: none; 
-      padding: 8px 16px; 
-      border-radius: 4px; 
-      cursor: pointer; 
-      margin: 5px; 
-      transition: background 0.2s; 
-    }
-    #business-page button:hover { 
-      background: #ff4081; 
-    }
-    #about { 
-      background: #171717; 
-      padding: 30px; 
-      border-radius: 8px; 
-      box-shadow: 0 0 8px rgba(0, 212, 255, 0.1); 
-      text-align: left; 
-    }
-    #about h2 { 
-      color: #00d4ff; 
-      font-size: 1.6em; 
-      margin-bottom: 12px; 
-    }
-    #about p { 
-      font-size: 0.95em; 
-      margin-bottom: 8px; 
-    }
-    @media (max-width: 768px) {
-      #sidebar { width: 200px; }
-      #sidebar.hidden { width: 0; padding: 0; }
-      #sidebar-toggle { left: 10px; }
-      #sidebar-toggle.hidden { left: 10px; }
-      #content { margin-left: 0; padding: 10px; }
-      #content.full { margin-left: 0; }
-      .search-filter { flex-direction: column; }
-      .hero { height: 40vh; }
-      #map { height: 50vh; }
-    }
-  </style>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
-</head>
-<body>
-  <div class="container">
-    <button id="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
-    <div id="sidebar" class="hidden">
-      <div class="user-info">
-        <h2 id="sidebar-name"></h2>
-        <p id="sidebar-status"></p>
-      </div>
-      <button id="auth-btn"><i class="fas fa-user"></i> <span>Sign Up / Login</span></button>
-      <button id="dashboard-btn" style="display: none;"><i class="fas fa-tachometer-alt"></i> <span>Dashboard</span></button>
-      <button id="logout" style="display: none;"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></button>
+  });
+}
+
+truckSearch.oninput = debounce(updateTruckList, 300);
+foodTypeFilter.onchange = updateTruckList;
+statusFilter.onchange = updateTruckList;
+
+// Business page with ratings and sharing
+function showBusinessPage(pin) {
+  document.getElementById('page-name').textContent = pin.name;
+  document.getElementById('page-foodType').textContent = `Food Type: ${pin.foodType}`;
+  document.getElementById('page-contact').textContent = `Contact: ${pin.contact}`;
+  document.getElementById('page-address').textContent = `Address: ${pin.address}`;
+  document.getElementById('page-hours').textContent = `Hours: ${pin.startTime} ${pin.startPeriod} - ${pin.endTime} ${pin.endPeriod}`;
+  document.getElementById('page-description').textContent = `Description: ${pin.description}`;
+  document.getElementById('page-specials').textContent = `Specials: ${pin.specials}`;
+  const photosDiv = document.getElementById('page-photos');
+  photosDiv.innerHTML = '';
+  if (pin.productPhotos && pin.productPhotos.length > 0) {
+    pin.productPhotos.forEach(url => {
+      const img = document.createElement('img');
+      img.src = url;
+      img.loading = 'lazy';
+      photosDiv.appendChild(img);
+    });
+  }
+  const businessPage = document.getElementById('business-page');
+  businessPage.innerHTML += `
+    <div class="rating">
+      <label>Rate:</label>
+      <select id="rating">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+      </select>
+      <button onclick="submitRating('${pin.id}')">Submit</button>
     </div>
-    <div id="content" class="full">
-      <section class="hero">
-        <div class="hero-content">
-          <h1>Streats Live</h1>
-          <p>Discover local food trucks in real-time</p>
-          <button onclick="document.getElementById('map').scrollIntoView()">Find Trucks Now</button>
-        </div>
-      </section>
-      <div class="search-filter">
-        <input type="text" id="truck-search" placeholder="Search food trucks...">
-        <select id="food-type-filter">
-          <option value="">All Food Types</option>
-        </select>
-        <select id="status-filter">
-          <option value="">All Status</option>
-          <option value="live">Live Now</option>
-          <option value="offline">Offline</option>
-        </select>
-      </div>
-      <div id="map"></div>
-      <div id="truck-list" class="truck-grid"></div>
-      <div id="auth-modal">
-        <h2 id="auth-title">Sign Up</h2>
-        <input type="email" id="email" placeholder="Email" required><br>
-        <input type="password" id="password" placeholder="Password" required><br>
-        <div id="signup-fields" style="display: none;">
-          <input type="text" id="name" placeholder="Business Name" required><br>
-          <input type="text" id="foodType" placeholder="Food Type (e.g., Tacos)" required><br>
-          <input type="text" id="contact" placeholder="Contact Info" required><br>
-          <input type="text" id="address" placeholder="Start typing address..." required><br>
-          <div id="address-preview"></div>
-          <div class="time-group">
-            <input type="text" id="startTime" placeholder="Start (e.g., 9:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$" required>
-            <select id="startPeriod" required>
-              <option value="AM">AM</option>
-              <option value="PM">PM</option>
-            </select>
-          </div>
-          <div class="time-group">
-            <input type="text" id="endTime" placeholder="End (e.g., 5:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$" required>
-            <select id="endPeriod" required>
-              <option value="AM">AM</option>
-              <option value="PM">PM</option>
-            </select>
-          </div>
-          <textarea id="description" placeholder="Description" required></textarea><br>
-          <input type="text" id="specials" placeholder="Specials (e.g., Taco Tuesday)" required><br>
-          <input type="file" id="photos" accept="image/*" multiple><br>
-        </div>
-        <button id="auth-submit">Submit</button>
-        <p id="auth-toggle">Already have an account? <a href="#" onclick="toggleAuthMode()">Login</a></p>
-      </div>
-      <div id="dashboard">
-        <h2>Dashboard</h2>
-        <input type="text" id="dash-name" placeholder="Business Name"><br>
-        <input type="text" id="dash-foodType" placeholder="Food Type"><br>
-        <input type="text" id="dash-contact" placeholder="Contact Info"><br>
-        <input type="text" id="dash-address" placeholder="Start typing address..."><br>
-        <div id="dash-address-preview"></div>
-        <div class="time-group">
-          <input type="text" id="dash-startTime" placeholder="Start (e.g., 9:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$">
-          <select id="dash-startPeriod">
-            <option value="AM">AM</option>
-            <option value="PM">PM</option>
-          </select>
-        </div>
-        <div class="time-group">
-          <input type="text" id="dash-endTime" placeholder="End (e.g., 5:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$">
-          <select id="dash-endPeriod">
-            <option value="AM">AM</option>
-            <option value="PM">PM</option>
-          </select>
-        </div>
-        <textarea id="dash-description" placeholder="Description"></textarea><br>
-        <input type="text" id="dash-specials" placeholder="Specials"><br>
-        <input type="file" id="dash-photos" accept="image/*" multiple><br>
-        <button id="update-profile">Update Profile</button>
-        <button id="live-toggle">Go Live</button>
-      </div>
-      <div id="about">
-        <h2>About Streats Live</h2>
-        <p>Connecting food lovers with local food trucks in real-time.</p>
-        <p><strong>Goals:</strong> Empower vendors, boost local cuisine.</p>
-        <p><strong>Team:</strong> Foodies and tech innovators.</p>
-      </div>
-    </div>
-    <div id="business-page">
-      <h2 id="page-name"></h2>
-      <p id="page-foodType"></p>
-      <p id="page-contact"></p>
-      <p id="page-address"></p>
-      <p id="page-hours"></p>
-      <p id="page-description"></p>
-      <p id="page-specials"></p>
-      <div id="page-photos"></div>
-      <!-- Rating and Share buttons added dynamically in JS -->
-      <button id="close-page" onclick="closeBusinessPage()">Close</button>
-    </div>
-  </div>
-  <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-firestore.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-storage.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-auth.js"></script>
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDeaGTuprL_qbUkydv-DdDYiIgh0_XPu88&libraries=places"></script>
-  <script src="script.js" defer></script>
-</body>
-</html>
+    <button onclick="shareOnX('${pin.name}')">Share on X</button>
+  `;
+  businessPage.style.display = 'block';
+}
+
+function closeBusinessPage() {
+  document.getElementById('business-page').style.display = 'none';
+}
+
+async function submitRating(pinId) {
+  const rating = document.getElementById('rating').value;
+  await db.collection('ratings').add({
+    pinId,
+    rating: parseInt(rating),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  alert('Rating submitted!');
+}
+
+function shareOnX(name) {
+  const url = window.location.href;
+  window.open(`https://x.com/intent/tweet?text=Check out ${name} on Streats Live!&url=${url}`, '_blank');
+}
+
+async function uploadPhotos(files, pinId) {
+  const photoUrls = [];
+  for (const file of files) {
+    const ref = storage.ref().child(`pins/${pinId}/${Date.now()}_${file.name}`);
+    console.log("Attempting to upload file:", file.name);
+    try {
+      const snapshot = await ref.put(file);
+      const url = await snapshot.ref.getDownloadURL();
+      photoUrls.push(url);
+      console.log("Successfully uploaded photo:", url);
+    } catch (error) {
+      console.error("Failed to upload photo:", file.name, error);
+      throw error;
+    }
+  }
+  return photoUrls;
+}
+
+// Error handling
+window.onerror = (msg, url, lineNo, columnNo, error) => {
+  console.error(`Unhandled error: ${msg} at ${url}:${lineNo}:${columnNo}`, error);
+};
