@@ -22,45 +22,10 @@ if (typeof firebase !== 'undefined') {
   }
 }
 
-// Initialize Leaflet map with OpenStreetMap
-console.log("Attempting to load map...");
-let map, clusterGroup = L.markerClusterGroup();
-const foodTruckIcon = L.icon({
-  iconUrl: 'https://cdn-icons-png.flaticon.com/512/1048/1048313.png',
-  iconSize: [38, 38],
-  iconAnchor: [19, 38],
-  popupAnchor: [0, -38]
-});
-navigator.geolocation.getCurrentPosition(position => {
-  const { latitude, longitude } = position.coords;
-  console.log("Geolocation success:", latitude, longitude);
-  map = L.map('map').setView([latitude, longitude], 13);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
-  }).addTo(map);
-  map.addLayer(clusterGroup);
-  loadPins();
-}, () => {
-  console.log("Geolocation failed, using fallback location");
-  map = L.map('map').setView([51.505, -0.09], 13);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
-  }).addTo(map);
-  map.addLayer(clusterGroup);
-  loadPins();
-});
-
-// Sidebar toggle
+// DOM Elements
 const sidebar = document.getElementById('sidebar');
 const sidebarToggle = document.getElementById('sidebar-toggle');
 const content = document.getElementById('content');
-sidebarToggle.onclick = () => {
-  sidebar.classList.toggle('hidden');
-  content.classList.toggle('full');
-  sidebarToggle.classList.toggle('hidden');
-};
-
-// Authentication handling
 const vendorAuthBtn = document.getElementById('vendor-auth-btn');
 const customerAuthBtn = document.getElementById('customer-auth-btn');
 const authModal = document.getElementById('auth-modal');
@@ -74,22 +39,71 @@ const logoutBtn = document.getElementById('logout');
 const updateProfileBtn = document.getElementById('update-profile');
 const liveToggle = document.getElementById('live-toggle');
 const vendorFields = document.getElementById('vendor-fields');
+const truckSearch = document.getElementById('truck-search');
+const foodTypeFilter = document.getElementById('food-type-filter');
+const statusFilter = document.getElementById('status-filter');
+
+// Global Variables
+let map, clusterGroup, allPins = [];
+const foodTruckIcon = L.icon({
+  iconUrl: 'https://cdn-icons-png.flaticon.com/512/1048/1048313.png',
+  iconSize: [38, 38],
+  iconAnchor: [19, 38],
+  popupAnchor: [0, -38]
+});
 let isSignupMode = true;
 let authType = null;
 
-vendorAuthBtn.onclick = () => {
-  authType = 'vendor';
-  authModal.style.display = 'block';
-  dashboard.style.display = 'none';
-  updateAuthMode();
-};
+// Initialize Leaflet map with OpenStreetMap
+console.log("Attempting to load map...");
+navigator.geolocation.getCurrentPosition(position => {
+  const { latitude, longitude } = position.coords;
+  console.log("Geolocation success:", latitude, longitude);
+  map = L.map('map').setView([latitude, longitude], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
+  }).addTo(map);
+  clusterGroup = L.markerClusterGroup();
+  map.addLayer(clusterGroup);
+  loadPins();
+}, () => {
+  console.log("Geolocation failed, using fallback location");
+  map = L.map('map').setView([51.505, -0.09], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
+  }).addTo(map);
+  clusterGroup = L.markerClusterGroup();
+  map.addLayer(clusterGroup);
+  loadPins();
+});
 
-customerAuthBtn.onclick = () => {
-  authType = 'customer';
-  authModal.style.display = 'block';
-  dashboard.style.display = 'none';
-  updateAuthMode();
-};
+// Sidebar toggle
+if (sidebarToggle) {
+  sidebarToggle.onclick = () => {
+    sidebar.classList.toggle('hidden');
+    content.classList.toggle('full');
+    sidebarToggle.classList.toggle('hidden');
+  };
+}
+
+// Authentication handling
+if (vendorAuthBtn) {
+  vendorAuthBtn.onclick = () => {
+    authType = 'vendor';
+    authModal.style.display = 'block';
+    dashboard.style.display = 'none';
+    updateAuthMode();
+  };
+}
+
+if (customerAuthBtn) {
+  customerAuthBtn.onclick = () => {
+    authType = 'customer';
+    authModal.style.display = 'block';
+    dashboard.style.display = 'none';
+    updateAuthMode();
+  };
+}
 
 function updateAuthMode() {
   if (isSignupMode) {
@@ -150,57 +164,59 @@ function initializeDashAutocomplete() {
 
 initializeSignUpAutocomplete();
 
-authSubmit.onclick = async () => {
-  const email = document.getElementById('email').value;
-  const password = document.getElementById('password').value;
-  try {
-    if (isSignupMode) {
-      const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-      const user = userCredential.user;
-      const userData = {
-        email,
-        name: document.getElementById('name').value,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      };
+if (authSubmit) {
+  authSubmit.onclick = async () => {
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    try {
+      if (isSignupMode) {
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        const user = userCredential.user;
+        const userData = {
+          email,
+          name: document.getElementById('name').value,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
 
-      if (authType === 'vendor') {
-        const place = signupAutocomplete.getPlace();
-        if (!place || !place.geometry) throw new Error("Please select an address from the dropdown");
-        const address = place.formatted_address;
-        const coords = { latitude: place.geometry.location.lat(), longitude: place.geometry.location.lng() };
-        Object.assign(userData, {
-          foodType: document.getElementById('foodType').value,
-          contact: document.getElementById('contact').value,
-          description: document.getElementById('description').value,
-          address,
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          startTime: document.getElementById('startTime').value,
-          startPeriod: document.getElementById('startPeriod').value,
-          endTime: document.getElementById('endTime').value,
-          endPeriod: document.getElementById('endPeriod').value,
-          specials: document.getElementById('specials').value,
-          approved: false,
-          productPhotos: []
-        });
-        await db.collection('vendors').doc(user.uid).set(userData);
-        await uploadInitialPhotos(user.uid);
-        console.log("Vendor signed up:", user.uid);
+        if (authType === 'vendor') {
+          const place = signupAutocomplete.getPlace();
+          if (!place || !place.geometry) throw new Error("Please select an address from the dropdown");
+          const address = place.formatted_address;
+          const coords = { latitude: place.geometry.location.lat(), longitude: place.geometry.location.lng() };
+          Object.assign(userData, {
+            foodType: document.getElementById('foodType').value,
+            contact: document.getElementById('contact').value,
+            description: document.getElementById('description').value,
+            address,
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            startTime: document.getElementById('startTime').value,
+            startPeriod: document.getElementById('startPeriod').value,
+            endTime: document.getElementById('endTime').value,
+            endPeriod: document.getElementById('endPeriod').value,
+            specials: document.getElementById('specials').value,
+            approved: false,
+            productPhotos: []
+          });
+          await db.collection('vendors').doc(user.uid).set(userData);
+          await uploadInitialPhotos(user.uid);
+          console.log("Vendor signed up:", user.uid);
+        } else {
+          userData.visitedTrucks = [];
+          await db.collection('customers').doc(user.uid).set(userData);
+          console.log("Customer signed up:", user.uid);
+        }
       } else {
-        userData.visitedTrucks = [];
-        await db.collection('customers').doc(user.uid).set(userData);
-        console.log("Customer signed up:", user.uid);
+        await auth.signInWithEmailAndPassword(email, password);
+        console.log("User logged in:", auth.currentUser.uid);
       }
-    } else {
-      await auth.signInWithEmailAndPassword(email, password);
-      console.log("User logged in:", auth.currentUser.uid);
+      authModal.style.display = 'none';
+    } catch (error) {
+      console.error("Auth failed:", error);
+      alert("Error: " + error.message);
     }
-    authModal.style.display = 'none';
-  } catch (error) {
-    console.error("Auth failed:", error);
-    alert("Error: " + error.message);
-  }
-};
+  };
+}
 
 async function uploadInitialPhotos(userId) {
   const photos = document.getElementById('photos').files;
@@ -293,75 +309,73 @@ function showDashboard(vendorData) {
   initializeDashAutocomplete();
 }
 
-updateProfileBtn.onclick = async () => {
-  const userId = auth.currentUser.uid;
-  try {
-    const vendorDoc = await db.collection('vendors').doc(userId).get();
-    if (!vendorDoc.data().approved) {
-      alert("Your account must be approved to edit your profile.");
-      return;
-    }
-    const place = dashAutocomplete.getPlace();
-    let address = document.getElementById('dash-address').value;
-    let coords = { latitude: null, longitude: null };
-    if (place && place.geometry) {
-      address = place.formatted_address;
-      coords.latitude = place.geometry.location.lat();
-      coords.longitude = place.geometry.location.lng();
-    } else {
-      const existingData = vendorDoc.data();
-      coords.latitude = existingData.latitude;
-      coords.longitude = existingData.longitude;
-    }
-    const updatedData = {
-      name: document.getElementById('dash-name').value,
-      foodType: document.getElementById('dash-foodType').value,
-      contact: document.getElementById('dash-contact').value,
-      address,
-      latitude: coords.latitude,
-      longitude: coords.longitude,
-      startTime: document.getElementById('dash-startTime').value,
-      startPeriod: document.getElementById('dash-startPeriod').value,
-      endTime: document.getElementById('dash-endTime').value,
-      endPeriod: document.getElementById('dash-endPeriod').value,
-      specials: document.getElementById('dash-specials').value,
-      description: document.getElementById('dash-description').value,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-    await db.collection('vendors').doc(userId).update(updatedData);
-    const photos = document.getElementById('dash-photos').files;
-    if (photos.length > 0) {
-      const photoUrls = await uploadPhotos(photos, userId);
-      await db.collection('vendors').doc(userId).update({
-        productPhotos: firebase.firestore.FieldValue.arrayUnion(...photoUrls)
-      });
-      const pinDoc = await db.collection('pins').doc(userId).get();
-      if (pinDoc.exists && pinDoc.data().live) {
-        await db.collection('pins').doc(userId).update({
-          productPhotos: firebase.firestore.FieldValue.arrayUnion(...photoUrls),
-          ...updatedData
-        });
+if (updateProfileBtn) {
+  updateProfileBtn.onclick = async () => {
+    const userId = auth.currentUser.uid;
+    try {
+      const vendorDoc = await db.collection('vendors').doc(userId).get();
+      if (!vendorDoc.data().approved) {
+        alert("Your account must be approved to edit your profile.");
+        return;
       }
+      const place = dashAutocomplete.getPlace();
+      let address = document.getElementById('dash-address').value;
+      let coords = { latitude: null, longitude: null };
+      if (place && place.geometry) {
+        address = place.formatted_address;
+        coords.latitude = place.geometry.location.lat();
+        coords.longitude = place.geometry.location.lng();
+      } else {
+        const existingData = vendorDoc.data();
+        coords.latitude = existingData.latitude;
+        coords.longitude = existingData.longitude;
+      }
+      const updatedData = {
+        name: document.getElementById('dash-name').value,
+        foodType: document.getElementById('dash-foodType').value,
+        contact: document.getElementById('dash-contact').value,
+        address,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        startTime: document.getElementById('dash-startTime').value,
+        startPeriod: document.getElementById('dash-startPeriod').value,
+        endTime: document.getElementById('dash-endTime').value,
+        endPeriod: document.getElementById('dash-endPeriod').value,
+        specials: document.getElementById('dash-specials').value,
+        description: document.getElementById('dash-description').value,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      await db.collection('vendors').doc(userId).update(updatedData);
+      const photos = document.getElementById('dash-photos').files;
+      if (photos.length > 0) {
+        const photoUrls = await uploadPhotos(photos, userId);
+        await db.collection('vendors').doc(userId).update({
+          productPhotos: firebase.firestore.FieldValue.arrayUnion(...photoUrls)
+        });
+        const pinDoc = await db.collection('pins').doc(userId).get();
+        if (pinDoc.exists && pinDoc.data().live) {
+          await db.collection('pins').doc(userId).update({
+            productPhotos: firebase.firestore.FieldValue.arrayUnion(...photoUrls),
+            ...updatedData
+          });
+        }
+      }
+      console.log("Profile updated for:", userId);
+      alert("Profile updated successfully!");
+    } catch (error) {
+      console.error("Profile update failed:", error);
+      alert("Error: " + error.message);
     }
-    console.log("Profile updated for:", userId);
-    alert("Profile updated successfully!");
-  } catch (error) {
-    console.error("Profile update failed:", error);
-    alert("Error: " + error.message);
-  }
-};
+  };
+}
 
-logoutBtn.onclick = async () => {
-  await auth.signOut();
-  console.log("User logged out");
-  dashboard.style.display = 'none';
-};
-
-// Search and Filter logic
-const truckSearch = document.getElementById('truck-search');
-const foodTypeFilter = document.getElementById('food-type-filter');
-const statusFilter = document.getElementById('status-filter');
-let allPins = [];
+if (logoutBtn) {
+  logoutBtn.onclick = async () => {
+    await auth.signOut();
+    console.log("User logged out");
+    dashboard.style.display = 'none';
+  };
+}
 
 function loadPins() {
   db.collection('pins').onSnapshot(snapshot => {
