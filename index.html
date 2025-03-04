@@ -4,6 +4,10 @@
   <title>Streats Live</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <style>
     body { 
       margin: 0; 
@@ -70,10 +74,18 @@
       font-size: 0.95em; 
       margin: 5px 0; 
       transition: background 0.2s, color 0.2s; 
+      display: flex; 
+      align-items: center; 
     }
     #sidebar.hidden button { 
       text-align: center; 
       padding: 12px 0; 
+    }
+    #sidebar.hidden button span { 
+      display: none; 
+    }
+    #sidebar.hidden button i { 
+      margin: 0; 
     }
     #sidebar button:hover { 
       background: #00d4ff; 
@@ -88,19 +100,81 @@
     #content.full { 
       margin-left: 60px; 
     }
-    h1 { 
-      color: #00d4ff; 
-      font-size: 2em; 
+    .hero { 
+      background: url('https://via.placeholder.com/1200x400?text=Food+Truck') no-repeat center/cover; 
+      height: 50vh; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
       text-align: center; 
-      margin-bottom: 20px; 
+      color: #fff; 
+      position: relative; 
+    }
+    .hero-content { 
+      background: rgba(0, 0, 0, 0.5); 
+      padding: 20px; 
+      border-radius: 8px; 
+    }
+    .hero h1 { 
+      color: #00d4ff; 
+      font-size: 2.5em; 
+      margin-bottom: 10px; 
+    }
+    .hero p { 
+      font-size: 1.2em; 
+    }
+    .hero button { 
+      background: #00d4ff; 
+      color: #0f0f0f; 
+      padding: 10px 20px; 
+      border: none; 
+      border-radius: 4px; 
+      cursor: pointer; 
+      margin-top: 10px; 
+    }
+    .hero button:hover { 
+      background: #ff4081; 
+    }
+    .search-filter { 
+      display: flex; 
+      gap: 10px; 
+      margin: 20px 0; 
+    }
+    .search-filter input, .search-filter select { 
+      padding: 8px; 
+      border: 1px solid #2a2a2a; 
+      border-radius: 4px; 
+      background: #222; 
+      color: #d4d4d4; 
+      flex: 1; 
     }
     #map { 
-      height: 90vh; 
+      height: 60vh; 
       width: 100%; 
       border-radius: 8px; 
       box-shadow: 0 0 8px rgba(0, 212, 255, 0.1); 
       margin-bottom: 20px; 
       background: #171717; 
+    }
+    #truck-list { 
+      display: grid; 
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+      gap: 15px; 
+      max-height: 40vh; 
+      overflow-y: auto; 
+    }
+    .truck-card { 
+      background: #171717; 
+      padding: 15px; 
+      border-radius: 8px; 
+      cursor: pointer; 
+      transition: transform 0.2s; 
+    }
+    .truck-card:hover { 
+      transform: scale(1.02); 
+    }
+    .truck-card.live { 
+      border: 2px solid #00d4ff; 
     }
     #auth-modal, #dashboard { 
       display: none; 
@@ -194,17 +268,28 @@
       margin: 8px 0; 
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2); 
     }
-    #close-page { 
-      background: #ff4081; 
-      color: #fff; 
+    #business-page .rating { 
+      margin: 10px 0; 
+    }
+    #business-page .rating select { 
+      padding: 5px; 
+      background: #222; 
+      color: #d4d4d4; 
+      border: 1px solid #2a2a2a; 
+      border-radius: 4px; 
+    }
+    #business-page button { 
+      background: #00d4ff; 
+      color: #0f0f0f; 
       border: none; 
       padding: 8px 16px; 
       border-radius: 4px; 
       cursor: pointer; 
+      margin: 5px; 
       transition: background 0.2s; 
     }
-    #close-page:hover { 
-      background: #00d4ff; 
+    #business-page button:hover { 
+      background: #ff4081; 
     }
     #about { 
       background: #171717; 
@@ -222,24 +307,53 @@
       font-size: 0.95em; 
       margin-bottom: 8px; 
     }
+    @media (max-width: 768px) {
+      #sidebar { width: 200px; }
+      #sidebar.hidden { width: 0; padding: 0; }
+      #sidebar-toggle { left: 10px; }
+      #sidebar-toggle.hidden { left: 10px; }
+      #content { margin-left: 0; padding: 10px; }
+      #content.full { margin-left: 0; }
+      .search-filter { flex-direction: column; }
+      .hero { height: 40vh; }
+      #map { height: 50vh; }
+    }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="container">
-    <button id="sidebar-toggle">☰</button>
+    <button id="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
     <div id="sidebar" class="hidden">
       <div class="user-info">
         <h2 id="sidebar-name"></h2>
         <p id="sidebar-status"></p>
       </div>
-      <button id="auth-btn">Sign Up / Login</button>
-      <button id="dashboard-btn" style="display: none;">Dashboard</button>
-      <button id="logout" style="display: none;">Logout</button>
+      <button id="auth-btn"><i class="fas fa-user"></i> <span>Sign Up / Login</span></button>
+      <button id="dashboard-btn" style="display: none;"><i class="fas fa-tachometer-alt"></i> <span>Dashboard</span></button>
+      <button id="logout" style="display: none;"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></button>
     </div>
     <div id="content" class="full">
-      <h1>Streats Live</h1>
+      <section class="hero">
+        <div class="hero-content">
+          <h1>Streats Live</h1>
+          <p>Discover local food trucks in real-time</p>
+          <button onclick="document.getElementById('map').scrollIntoView()">Find Trucks Now</button>
+        </div>
+      </section>
+      <div class="search-filter">
+        <input type="text" id="truck-search" placeholder="Search food trucks...">
+        <select id="food-type-filter">
+          <option value="">All Food Types</option>
+        </select>
+        <select id="status-filter">
+          <option value="">All Status</option>
+          <option value="live">Live Now</option>
+          <option value="offline">Offline</option>
+        </select>
+      </div>
       <div id="map"></div>
+      <div id="truck-list" class="truck-grid"></div>
       <div id="auth-modal">
         <h2 id="auth-title">Sign Up</h2>
         <input type="email" id="email" placeholder="Email" required><br>
@@ -314,6 +428,7 @@
       <p id="page-description"></p>
       <p id="page-specials"></p>
       <div id="page-photos"></div>
+      <!-- Rating and Share buttons added dynamically in JS -->
       <button id="close-page" onclick="closeBusinessPage()">Close</button>
     </div>
   </div>
