@@ -68,10 +68,15 @@
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
       max-height: 90vh;
       overflow-y: auto;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1001;
     }
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; transform: translate(-50%, -60%); }
+      to { opacity: 1; transform: translate(-50%, -50%); }
     }
     input, select, textarea {
       border: 1px solid #e2e8f0;
@@ -101,6 +106,8 @@
     #loading-overlay.active {
       opacity: 1;
     }
+    #main-content { transition: opacity 0.3s; }
+    #main-content.hidden { opacity: 0; }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
@@ -118,7 +125,7 @@
     </nav>
   </header>
 
-  <main class="container mx-auto pt-24 pb-12 px-6">
+  <main id="main-content" class="container mx-auto pt-24 pb-12 px-6">
     <section class="mb-12">
       <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
         <input type="text" id="location-filter" placeholder="Near Me" class="flex-1">
@@ -138,7 +145,7 @@
     <div id="truck-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
   </main>
 
-  <div id="vendor-modal" class="modal hidden fixed inset-0 m-auto p-8 max-w-md w-full">
+  <div id="vendor-modal" class="modal hidden p-8 max-w-md w-full">
     <h2 id="vendor-title" class="text-2xl font-bold text-gray-900 mb-6">Vendor Portal</h2>
     <input type="email" id="vendor-email" placeholder="Email" required class="mb-4">
     <input type="password" id="vendor-password" placeholder="Password" required class="mb-6">
@@ -172,7 +179,7 @@
     <p id="vendor-toggle" class="text-center mt-4 text-gray-600">Already have an account? <a href="#" onclick="toggleVendorAuthMode()" class="text-pink-600">Login</a></p>
   </div>
 
-  <div id="customer-modal" class="modal hidden fixed inset-0 m-auto p-8 max-w-md w-full">
+  <div id="customer-modal" class="modal hidden p-8 max-w-md w-full">
     <h2 id="customer-title" class="text-2xl font-bold text-gray-900 mb-6">Foodie Hub</h2>
     <input type="email" id="customer-email" placeholder="Email" required class="mb-4">
     <input type="password" id="customer-password" placeholder="Password" required class="mb-6">
@@ -183,7 +190,7 @@
     <p id="customer-toggle" class="text-center mt-4 text-gray-600">Already have an account? <a href="#" onclick="toggleCustomerAuthMode()" class="text-pink-600">Login</a></p>
   </div>
 
-  <div id="vendor-dashboard" class="modal hidden fixed inset-0 m-auto p-8 max-w-3xl w-full">
+  <div id="vendor-dashboard" class="modal hidden p-8 max-w-3xl w-full">
     <h2 class="text-2xl font-bold text-gray-900 mb-6">Vendor Dashboard</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div>
@@ -224,7 +231,7 @@
     </div>
   </div>
 
-  <div id="business-page" class="modal hidden fixed inset-0 m-auto p-8 max-w-4xl w-full">
+  <div id="business-page" class="modal hidden p-8 max-w-4xl w-full">
     <h2 id="page-name" class="text-3xl font-bold text-gray-900 mb-6"></h2>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       <div class="md:col-span-2">
@@ -249,24 +256,24 @@
     <button id="close-page" onclick="closeBusinessPage()" class="btn-secondary w-full mt-6">Close</button>
   </div>
 
-  <div id="reviews-modal" class="modal hidden fixed inset-0 m-auto p-8 max-w-2xl w-full">
+  <div id="reviews-modal" class="modal hidden p-8 max-w-2xl w-full">
     <h2 class="text-2xl font-bold text-gray-900 mb-6">Reviews for <span id="review-truck-name"></span></h2>
     <div id="review-list" class="space-y-6"></div>
-    <button id="close-reviews" onclick="document.getElementById('reviews-modal').classList.add('hidden')" class="btn-secondary w-full mt-6">Close</button>
+    <button id="close-reviews" onclick="closeModal('reviews-modal')" class="btn-secondary w-full mt-6">Close</button>
   </div>
 
-  <div id="order-modal" class="modal hidden fixed inset-0 m-auto p-8 max-w-md w-full">
+  <div id="order-modal" class="modal hidden p-8 max-w-md w-full">
     <h2 class="text-2xl font-bold text-gray-900 mb-6">Order from <span id="order-truck-name"></span></h2>
     <div id="order-menu" class="space-y-4"></div>
     <button id="place-order" class="btn-primary w-full mt-6">Place Order</button>
-    <button onclick="document.getElementById('order-modal').classList.add('hidden')" class="btn-secondary w-full mt-4">Cancel</button>
+    <button onclick="closeModal('order-modal')" class="btn-secondary w-full mt-4">Cancel</button>
   </div>
 
-  <div id="visit-modal" class="modal hidden fixed inset-0 m-auto p-8 max-w-md w-full">
+  <div id="visit-modal" class="modal hidden p-8 max-w-md w-full">
     <h2 class="text-2xl font-bold text-gray-900 mb-6">Mark Visit to <span id="visit-truck-name"></span></h2>
     <input type="file" id="visit-receipt" accept="image/*" class="mb-6">
     <button id="submit-visit" class="btn-primary w-full">Submit Receipt</button>
-    <button onclick="document.getElementById('visit-modal').classList.add('hidden')" class="btn-secondary w-full mt-4">Cancel</button>
+    <button onclick="closeModal('visit-modal')" class="btn-secondary w-full mt-4">Cancel</button>
   </div>
 
   <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-app.js"></script>
