@@ -221,7 +221,7 @@
       font-size: 0.8em; 
       color: #ff4081; 
     }
-    #auth-modal, #dashboard, #reviews-modal { 
+    #auth-modal, #dashboard, #reviews-modal, #order-modal { 
       display: none; 
       background: #171717; 
       padding: 30px; 
@@ -240,7 +240,7 @@
       from { opacity: 0; transform: translate(-50%, -60%); } 
       to { opacity: 1; transform: translate(-50%, -50%); } 
     }
-    #auth-modal input, #dashboard input, #dashboard textarea, #dashboard select, #reviews-modal textarea { 
+    #auth-modal input, #dashboard input, #dashboard textarea, #dashboard select, #reviews-modal textarea, #order-modal select { 
       width: 100%; 
       padding: 10px; 
       margin: 6px 0; 
@@ -251,7 +251,7 @@
       font-size: 0.9em; 
       transition: border-color 0.2s; 
     }
-    #auth-modal input:focus, #dashboard input:focus, #dashboard textarea:focus, #dashboard select:focus, #reviews-modal textarea:focus { 
+    #auth-modal input:focus, #dashboard input:focus, #dashboard textarea:focus, #dashboard select:focus, #reviews-modal textarea:focus, #order-modal select:focus { 
       border-color: #00d4ff; 
       outline: none; 
     }
@@ -259,7 +259,7 @@
       height: 90px; 
       resize: vertical; 
     }
-    #auth-modal button, #dashboard button, #reviews-modal button { 
+    #auth-modal button, #dashboard button, #reviews-modal button, #order-modal button { 
       background: #00d4ff; 
       color: #0f0f0f; 
       border: none; 
@@ -271,7 +271,7 @@
       margin-top: 6px; 
       transition: background 0.2s, transform 0.1s; 
     }
-    #auth-modal button:hover, #dashboard button:hover, #reviews-modal button:hover { 
+    #auth-modal button:hover, #dashboard button:hover, #reviews-modal button:hover, #order-modal button:hover { 
       background: #ff4081; 
       transform: translateY(-1px); 
     }
@@ -351,6 +351,14 @@
     #reviews-modal .rating-score { 
       color: #ff4081; 
       font-weight: bold; 
+    }
+    #dashboard .menu-item { 
+      margin: 10px 0; 
+      display: flex; 
+      gap: 10px; 
+    }
+    #order-modal .menu-item { 
+      margin: 10px 0; 
     }
     #about { 
       background: #171717; 
@@ -481,6 +489,14 @@
         <textarea id="dash-description" placeholder="Description"></textarea><br>
         <input type="text" id="dash-specials" placeholder="Specials"><br>
         <input type="file" id="dash-photos" accept="image/*" multiple><br>
+        <h3>Menu</h3>
+        <div id="menu-items">
+          <div class="menu-item">
+            <input type="text" placeholder="Item Name" class="menu-name">
+            <input type="number" placeholder="Price ($)" class="menu-price" step="0.01">
+          </div>
+        </div>
+        <button onclick="addMenuItem()">Add Item</button>
         <button id="update-profile">Update Profile</button>
         <button id="live-toggle">Go Live</button>
       </div>
@@ -488,6 +504,12 @@
         <h2>Reviews for <span id="review-truck-name"></span></h2>
         <div id="review-list"></div>
         <button id="close-reviews" onclick="document.getElementById('reviews-modal').style.display = 'none'">Close</button>
+      </div>
+      <div id="order-modal">
+        <h2>Order from <span id="order-truck-name"></span></h2>
+        <div id="order-menu"></div>
+        <button id="place-order">Place Order</button>
+        <button onclick="document.getElementById('order-modal').style.display = 'none'">Cancel</button>
       </div>
     </div>
     <div id="business-page">
