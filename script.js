@@ -66,24 +66,22 @@ document.getElementById('customer-btn').onclick = () => {
 };
 
 function updateVendorAuthMode() {
-  const modal = document.getElementById('vendor-modal');
-  modal.querySelector('h2').textContent = vendorSignupMode ? "Vendor Sign Up" : "Vendor Login";
+  document.getElementById('vendor-title').textContent = vendorSignupMode ? "Vendor Sign Up" : "Vendor Login";
   document.getElementById('vendor-signup-fields').classList.toggle('hidden', !vendorSignupMode);
   document.getElementById('vendor-submit').textContent = vendorSignupMode ? "Sign Up" : "Login";
   document.getElementById('vendor-toggle').innerHTML = vendorSignupMode
-    ? 'Already have an account? <a href="#" onclick="toggleVendorAuthMode()" class="text-cyan-400">Login</a>'
-    : 'Need an account? <a href="#" onclick="toggleVendorAuthMode()" class="text-cyan-400">Sign Up</a>';
+    ? 'Already have an account? <a href="#" onclick="toggleVendorAuthMode()" class="text-red-600">Login</a>'
+    : 'Need an account? <a href="#" onclick="toggleVendorAuthMode()" class="text-red-600">Sign Up</a>';
   if (vendorSignupMode) initializeVendorAutocomplete();
 }
 
 function updateCustomerAuthMode() {
-  const modal = document.getElementById('customer-modal');
-  modal.querySelector('h2').textContent = customerSignupMode ? "Customer Sign Up" : "Customer Login";
+  document.getElementById('customer-title').textContent = customerSignupMode ? "Foodie Sign Up" : "Foodie Login";
   document.getElementById('customer-signup-fields').classList.toggle('hidden', !customerSignupMode);
   document.getElementById('customer-submit').textContent = customerSignupMode ? "Sign Up" : "Login";
   document.getElementById('customer-toggle').innerHTML = customerSignupMode
-    ? 'Already have an account? <a href="#" onclick="toggleCustomerAuthMode()" class="text-cyan-400">Login</a>'
-    : 'Need an account? <a href="#" onclick="toggleCustomerAuthMode()" class="text-cyan-400">Sign Up</a>';
+    ? 'Already have an account? <a href="#" onclick="toggleCustomerAuthMode()" class="text-red-600">Login</a>'
+    : 'Need an account? <a href="#" onclick="toggleCustomerAuthMode()" class="text-red-600">Sign Up</a>';
 }
 
 function toggleVendorAuthMode() {
@@ -98,7 +96,7 @@ function toggleCustomerAuthMode() {
   event.preventDefault();
 }
 
-let vendorAutocomplete;
+let vendorAutocomplete, dashAutocomplete;
 function initializeVendorAutocomplete() {
   const input = document.getElementById('vendor-address');
   if (!input) return;
@@ -111,6 +109,22 @@ function initializeVendorAutocomplete() {
     const place = vendorAutocomplete.getPlace();
     if (place.geometry) {
       document.getElementById('vendor-address-preview').textContent = `Selected: ${place.formatted_address}`;
+    }
+  });
+}
+
+function initializeDashAutocomplete() {
+  const input = document.getElementById('dash-address');
+  if (!input) return;
+  dashAutocomplete = new google.maps.places.Autocomplete(input, {
+    types: ['address'],
+    componentRestrictions: { country: 'us' },
+    fields: ['formatted_address', 'geometry.location']
+  });
+  dashAutocomplete.addListener('place_changed', () => {
+    const place = dashAutocomplete.getPlace();
+    if (place.geometry) {
+      document.getElementById('dash-address-preview').textContent = `Selected: ${place.formatted_address}`;
     }
   });
 }
@@ -151,6 +165,8 @@ document.getElementById('vendor-submit').onclick = async () => {
     } else {
       const userCredential = await auth.signInWithEmailAndPassword(email, password);
       user = userCredential.user;
+      const vendorDoc = await db.collection('vendors').doc(user.uid).get();
+      if (vendorDoc.exists && vendorDoc.data().approved) showVendorDashboard(vendorDoc.data());
     }
     document.getElementById('vendor-modal').classList.add('hidden');
   } catch (error) {
@@ -188,22 +204,17 @@ document.getElementById('customer-submit').onclick = async () => {
 };
 
 auth.onAuthStateChanged(async user => {
+  const logoutBtn = document.getElementById('logout');
   if (user) {
-    document.getElementById('vendor-btn').classList.add('hidden');
-    document.getElementById('customer-btn').classList.add('hidden');
-    document.getElementById('logout').classList.remove('hidden');
+    logoutBtn.classList.remove('hidden');
     const vendorDoc = await db.collection('vendors').doc(user.uid).get();
     const customerDoc = await db.collection('customers').doc(user.uid).get();
-    if (vendorDoc.exists && vendorDoc.data().approved) {
-      document.getElementById('vendor-btn').classList.remove('hidden');
-    }
-    if (customerDoc.exists) {
-      document.getElementById('customer-btn').classList.remove('hidden');
-    }
+    if (!vendorDoc.exists) document.getElementById('vendor-btn').textContent = "Become a Vendor";
+    if (!customerDoc.exists) document.getElementById('customer-btn').textContent = "Join as Foodie";
   } else {
-    document.getElementById('vendor-btn').classList.remove('hidden');
-    document.getElementById('customer-btn').classList.remove('hidden');
-    document.getElementById('logout').classList.add('hidden');
+    logoutBtn.classList.add('hidden');
+    document.getElementById('vendor-btn').textContent = "Vendor Portal";
+    document.getElementById('customer-btn').textContent = "Foodie Hub";
     document.getElementById('vendor-dashboard').classList.add('hidden');
   }
 });
@@ -273,11 +284,14 @@ function updateTruckList() {
 
     if (currentHours >= startHours && currentHours <= endHours) {
       const card = document.createElement('div');
-      card.className = `truck-card bg-gray-800 p-4 rounded-lg ${pin.live ? 'border-2 border-cyan-400' : ''}`;
+      card.className = `truck-card bg-white shadow-md ${pin.live ? 'border-t-4 border-red-500' : ''}`;
       card.innerHTML = `
-        <h3 class="text-xl font-bold text-white">${pin.name}</h3>
-        <p class="text-gray-400">${pin.foodType} • ${pin.live ? 'Live Now' : 'Offline'}</p>
-        <p class="text-pink-400">${pin.avgRating || 'No'} ★ (${pin.ratingCount || 0} reviews)</p>
+        <img src="${pin.productPhotos?.[0] || 'https://via.placeholder.com/300x150'}" alt="${pin.name}" class="w-full h-40 object-cover">
+        <div class="p-4">
+          <h3 class="text-xl font-semibold text-gray-900">${pin.name}</h3>
+          <p class="text-gray-600">${pin.foodType} • ${pin.live ? 'Live Now' : 'Offline'}</p>
+          <p class="text-red-600 font-medium">${pin.avgRating || 'No'} ★ (${pin.ratingCount || 0} reviews)</p>
+        </div>
       `;
       card.onclick = () => showBusinessPage(pin);
       truckList.appendChild(card);
@@ -316,50 +330,47 @@ async function showBusinessPage(pin) {
     pin.productPhotos.forEach(url => {
       const img = document.createElement('img');
       img.src = url;
-      img.className = 'rounded-lg';
+      img.className = 'w-full h-32 object-cover rounded-lg';
       img.loading = 'lazy';
       photosDiv.appendChild(img);
     });
   }
 
-  actions.innerHTML = `
-    <div class="rating space-y-2">
-      <label class="text-cyan-400">Rate:</label>
-      <select id="rating" class="w-full p-2 bg-gray-800 border border-gray-700 rounded-lg">
+  actions.innerHTML = auth.currentUser ? `
+    <div class="rating space-y-4">
+      <label class="text-gray-700 font-medium">Rate:</label>
+      <select id="rating" class="w-full">
         <option value="1">1</option>
         <option value="2">2</option>
         <option value="3">3</option>
         <option value="4">4</option>
         <option value="5">5</option>
       </select>
-      <textarea id="comment" placeholder="Leave a comment about your visit" class="w-full p-2 bg-gray-800 border border-gray-700 rounded-lg"></textarea>
-      <button id="submit-rating" class="btn-primary w-full py-2">Submit</button>
+      <textarea id="comment" placeholder="Leave a comment about your visit" rows="3" class="w-full"></textarea>
+      <button id="submit-rating" class="btn-primary w-full">Submit Review</button>
     </div>
-    <button onclick="showVisitModal('${pin.id}', '${pin.name}')" class="btn-primary w-full py-2">Mark as Visited</button>
-    <button onclick="showOrderModal('${pin.id}', '${pin.name}')" class="btn-primary w-full py-2">Order Now</button>
+    <button onclick="showVisitModal('${pin.id}', '${pin.name}')" class="btn-primary w-full">Mark as Visited</button>
+    <button onclick="showOrderModal('${pin.id}', '${pin.name}')" class="btn-primary w-full">Order Now</button>
+  ` : `
+    <p class="text-gray-600">Log in to leave a review, mark as visited, or order.</p>
+    <button onclick="document.getElementById('customer-modal').classList.remove('hidden'); updateCustomerAuthMode()" class="btn-primary w-full">Log In</button>
   `;
 
-  const submitBtn = document.getElementById('submit-rating');
-  if (!auth.currentUser) {
-    submitBtn.disabled = true;
-    submitBtn.textContent = "Login as Customer to Rate";
-  } else {
+  if (auth.currentUser) {
     const customerDoc = await db.collection('customers').doc(auth.currentUser.uid).get();
-    if (!customerDoc.exists) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Customer Account Required";
-    } else {
-      const userId = auth.currentUser.uid;
-      const existingReview = await db.collection('ratings').where('pinId', '==', pin.id).where('userId', '==', userId).get();
+    if (customerDoc.exists) {
+      const existingReview = await db.collection('ratings').where('pinId', '==', pin.id).where('userId', '==', auth.currentUser.uid).get();
+      const submitBtn = document.getElementById('submit-rating');
       if (!existingReview.empty) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = "See What Others Are Saying";
-        submitBtn.onclick = () => showReviews(pin);
+        submitBtn.disabled = true;
+        submitBtn.textContent = "You’ve Already Reviewed";
       } else {
         submitBtn.onclick = () => submitRating(pin.id);
       }
     }
   }
+
+  document.getElementById('view-reviews').onclick = () => showReviews(pin);
   businessPage.classList.remove('hidden');
 }
 
@@ -385,10 +396,9 @@ async function submitRating(pinId) {
       reviewerName: customerDoc.data().name,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-    alert("Rating submitted successfully!");
-    document.getElementById('submit-rating').disabled = false;
-    document.getElementById('submit-rating').textContent = "See What Others Are Saying";
-    document.getElementById('submit-rating').onclick = () => showReviews({ id: pinId, name: document.getElementById('page-name').textContent });
+    alert("Review submitted successfully!");
+    document.getElementById('submit-rating').disabled = true;
+    document.getElementById('submit-rating').textContent = "You’ve Already Reviewed";
   } catch (error) {
     console.error("Rating submission failed:", error);
     alert("Error submitting rating: " + error.message);
@@ -403,15 +413,15 @@ async function showReviews(pin) {
 
   const reviews = await db.collection('ratings').where('pinId', '==', pin.id).orderBy('createdAt', 'desc').get();
   if (reviews.empty) {
-    reviewList.innerHTML = '<p class="text-gray-400">No reviews yet.</p>';
+    reviewList.innerHTML = '<p class="text-gray-600">No reviews yet.</p>';
   } else {
     reviews.forEach(doc => {
       const data = doc.data();
       const reviewDiv = document.createElement('div');
-      reviewDiv.className = 'review';
+      reviewDiv.className = 'border-b border-gray-200 pb-4';
       reviewDiv.innerHTML = `
-        <p class="text-pink-400 font-bold">${data.rating} ★ by ${data.reviewerName}</p>
-        <p class="text-gray-300">${data.comment}</p>
+        <p class="text-red-600 font-semibold">${data.rating} ★ <span class="text-gray-600">by ${data.reviewerName}</span></p>
+        <p class="text-gray-700">${data.comment}</p>
       `;
       reviewList.appendChild(reviewDiv);
     });
@@ -460,7 +470,7 @@ async function markVisited(pinId) {
   const visitedTrucks = customerDoc.data().visitedTrucks || {};
   visitedTrucks[pinId] = (visitedTrucks[pinId] || 0) + 1;
   const points = customerDoc.data().points || 0;
-  const newPoints = points + 20; // 20 points for first visit
+  const newPoints = points + 20;
   let badges = customerDoc.data().badges || [];
   const totalVisits = Object.keys(visitedTrucks).length;
   if (totalVisits >= 30 && !badges.includes("Foodie Legend")) badges.push("Foodie Legend");
@@ -473,7 +483,6 @@ async function markVisited(pinId) {
   await db.collection('customers').doc(userId).update({ visitedTrucks, points: newPoints, badges, coupons });
   alert("Visit marked successfully! +20 points");
   document.getElementById('visit-modal').classList.add('hidden');
-  loadTruckTrek(userId);
 }
 
 async function showOrderModal(pinId, truckName) {
@@ -485,15 +494,15 @@ async function showOrderModal(pinId, truckName) {
   const pinDoc = await db.collection('pins').doc(pinId).get();
   const menu = pinDoc.data().menu || [];
   if (menu.length === 0) {
-    orderMenu.innerHTML = '<p class="text-gray-400">No menu items available.</p>';
+    orderMenu.innerHTML = '<p class="text-gray-600">No menu items available.</p>';
   } else {
     menu.forEach((item, index) => {
       const adjustedPrice = (item.price * PRICE_MARKUP).toFixed(2);
       const div = document.createElement('div');
-      div.className = 'menu-item';
+      div.className = 'flex justify-between items-center';
       div.innerHTML = `
-        <p class="text-white">${item.name} - $${adjustedPrice}</p>
-        <select id="quantity-${index}" class="w-full p-2 bg-gray-800 border border-gray-700 rounded-lg">
+        <p class="text-gray-900">${item.name} - $${adjustedPrice}</p>
+        <select id="quantity-${index}" class="w-20">
           <option value="0">0</option>
           <option value="1">1</option>
           <option value="2">2</option>
@@ -540,75 +549,134 @@ async function placeOrder(pinId, truckName, menu) {
   });
   alert(`Order placed successfully! Total: $${total} (+10 points)`);
   document.getElementById('order-modal').classList.add('hidden');
-  loadTruckTrek(userId);
 }
 
 function addMenuItem() {
   const menuItems = document.getElementById('menu-items');
   const div = document.createElement('div');
-  div.className = 'menu-item flex space-x-2 mb-4';
+  div.className = 'flex space-x-4 mb-4';
   div.innerHTML = `
-    <input type="text" placeholder="Item Name" class="menu-name flex-1 p-2 bg-gray-800 border border-gray-700 rounded-lg">
-    <input type="number" placeholder="Price ($)" class="menu-price w-1/3 p-2 bg-gray-800 border border-gray-700 rounded-lg" step="0.01">
+    <input type="text" placeholder="Item Name" class="menu-name flex-1">
+    <input type="number" placeholder="Price ($)" class="menu-price w-1/3" step="0.01">
   `;
   menuItems.appendChild(div);
 }
 
-async function loadTruckTrek(userId) {
-  const customerDoc = await db.collection('customers').doc(userId).get();
-  if (!customerDoc.exists) return;
-  const points = customerDoc.data().points || 0;
-  const badges = customerDoc.data().badges || [];
-  const truckTrek = document.getElementById('truck-trek') || document.createElement('div');
-  truckTrek.id = 'truck-trek';
-  truckTrek.className = 'text-center mt-4';
-  truckTrek.innerHTML = `
-    <p><span class="points text-cyan-400 font-bold">${points}</span> Points</p>
-    <p>Badge: <span class="badge text-pink-400 italic">${badges.length > 0 ? badges[badges.length - 1] : "Newbie"}</span></p>
-  `;
-  document.getElementById('main-content').appendChild(truckTrek);
+function showVendorDashboard(vendorData) {
+  const dashboard = document.getElementById('vendor-dashboard');
+  document.getElementById('dash-name').value = vendorData.name || '';
+  document.getElementById('dash-foodType').value = vendorData.foodType || '';
+  document.getElementById('dash-contact').value = vendorData.contact || '';
+  document.getElementById('dash-address').value = vendorData.address || '';
+  document.getElementById('dash-startTime').value = vendorData.startTime || '';
+  document.getElementById('dash-startPeriod').value = vendorData.startPeriod || 'AM';
+  document.getElementById('dash-endTime').value = vendorData.endTime || '';
+  document.getElementById('dash-endPeriod').value = vendorData.endPeriod || 'PM';
+  document.getElementById('dash-description').value = vendorData.description || '';
+  document.getElementById('dash-specials').value = vendorData.specials || '';
+  const menuItems = document.getElementById('menu-items');
+  menuItems.innerHTML = '';
+  (vendorData.menu || []).forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'flex space-x-4 mb-4';
+    div.innerHTML = `
+      <input type="text" value="${item.name}" class="menu-name flex-1">
+      <input type="number" value="${item.price}" class="menu-price w-1/3" step="0.01">
+    `;
+    menuItems.appendChild(div);
+  });
+  document.getElementById('live-toggle').textContent = vendorData.live ? "Go Offline" : "Go Live";
+  document.getElementById('live-toggle').onclick = () => toggleLiveStatus(auth.currentUser.uid, vendorData.live);
+  document.getElementById('update-profile').onclick = () => updateVendorProfile(auth.currentUser.uid);
+  initializeDashAutocomplete();
+  dashboard.classList.remove('hidden');
 }
 
-async function uploadPhotos(files, inputId) {
+async function toggleLiveStatus(userId, isLive) {
+  const vendorDoc = await db.collection('vendors').doc(userId).get();
+  const vendorData = vendorDoc.data();
+  if (!vendorData.approved) return alert("Your account must be approved to go live.");
+  if (isLive) {
+    await db.collection('pins').doc(userId).delete();
+    document.getElementById('live-toggle').textContent = "Go Live";
+  } else {
+    await db.collection('pins').doc(userId).set({
+      ...vendorData,
+      live: true,
+      latitude: vendorData.latitude,
+      longitude: vendorData.longitude,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    document.getElementById('live-toggle').textContent = "Go Offline";
+  }
+}
+
+async function updateVendorProfile(userId) {
+  try {
+    const vendorDoc = await db.collection('vendors').doc(userId).get();
+    if (!vendorDoc.data().approved) return alert("Your account must be approved to edit.");
+    const place = dashAutocomplete.getPlace();
+    let address = document.getElementById('dash-address').value;
+    let coords = { latitude: null, longitude: null };
+    if (place && place.geometry) {
+      address = place.formatted_address;
+      coords.latitude = place.geometry.location.lat();
+      coords.longitude = place.geometry.location.lng();
+    } else {
+      const existingData = vendorDoc.data();
+      coords.latitude = existingData.latitude;
+      coords.longitude = existingData.longitude;
+    }
+    const menuItems = Array.from(document.querySelectorAll('.menu-item')).map(item => ({
+      name: item.querySelector('.menu-name').value,
+      price: parseFloat(item.querySelector('.menu-price').value) || 0
+    })).filter(item => item.name && item.price > 0);
+    const updatedData = {
+      name: document.getElementById('dash-name').value,
+      foodType: document.getElementById('dash-foodType').value,
+      contact: document.getElementById('dash-contact').value,
+      address,
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      startTime: document.getElementById('dash-startTime').value,
+      startPeriod: document.getElementById('dash-startPeriod').value,
+      endTime: document.getElementById('dash-endTime').value,
+      endPeriod: document.getElementById('dash-endPeriod').value,
+      specials: document.getElementById('dash-specials').value,
+      description: document.getElementById('dash-description').value,
+      menu: menuItems,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    await db.collection('vendors').doc(userId).update(updatedData);
+    const photos = document.getElementById('dash-photos').files;
+    if (photos.length > 0) {
+      const photoUrls = await uploadInitialPhotos(userId, 'dash-photos');
+      await db.collection('vendors').doc(userId).update({
+        productPhotos: firebase.firestore.FieldValue.arrayUnion(...photoUrls)
+      });
+      const pinDoc = await db.collection('pins').doc(userId).get();
+      if (pinDoc.exists && pinDoc.data().live) {
+        await db.collection('pins').doc(userId).update({
+          productPhotos: firebase.firestore.FieldValue.arrayUnion(...photoUrls),
+          ...updatedData
+        });
+      }
+    }
+    alert("Profile updated successfully!");
+  } catch (error) {
+    console.error("Profile update failed:", error);
+    alert("Error: " + error.message);
+  }
+}
+
+async function uploadInitialPhotos(userId, inputId) {
+  const photos = document.getElementById(inputId).files;
   const photoUrls = [];
-  for (const file of files) {
-    const ref = storage.ref().child(`photos/${auth.currentUser.uid}/${Date.now()}_${file.name}`);
+  for (const file of photos) {
+    const ref = storage.ref().child(`photos/${userId}/${Date.now()}_${file.name}`);
     await ref.put(file);
     const url = await ref.getDownloadURL();
     photoUrls.push(url);
   }
   return photoUrls;
 }
-
-// Vendor dashboard
-document.getElementById('vendor-btn').addEventListener('click', async () => {
-  const vendorDoc = await db.collection('vendors').doc(auth.currentUser.uid).get();
-  if (vendorDoc.exists && vendorDoc.data().approved) {
-    const dashboard = document.getElementById('vendor-dashboard');
-    const data = vendorDoc.data();
-    document.getElementById('dash-name').value = data.name || '';
-    document.getElementById('dash-foodType').value = data.foodType || '';
-    document.getElementById('dash-contact').value = data.contact || '';
-    document.getElementById('dash-address').value = data.address || '';
-    document.getElementById('dash-startTime').value = data.startTime || '';
-    document.getElementById('dash-startPeriod').value = data.startPeriod || 'AM';
-    document.getElementById('dash-endTime').value = data.endTime || '';
-    document.getElementById('dash-endPeriod').value = data.endPeriod || 'PM';
-    document.getElementById('dash-description').value = data.description || '';
-    document.getElementById('dash-specials').value = data.specials || '';
-    const menuItems = document.getElementById('menu-items');
-    menuItems.innerHTML = '';
-    (data.menu || []).forEach(item => {
-      const div = document.createElement('div');
-      div.className = 'menu-item flex space-x-2 mb-4';
-      div.innerHTML = `
-        <input type="text" value="${item.name}" class="menu-name flex-1 p-2 bg-gray-800 border border-gray-700 rounded-lg">
-        <input type="number" value="${item.price}" class="menu-price w-1/3 p-2 bg-gray-800 border border-gray-700 rounded-lg" step="0.01">
-      `;
-      menuItems.appendChild(div);
-    });
-    const pinDoc = await db.collection('pins').doc(auth.currentUser.uid).get();
-    document.getElementById('live-toggle').textContent = pinDoc.exists && pinDoc.data().live ? "Go Offline" : "Go Live";
-    dashboard.classList.remove('hidden');
-  }
-});
