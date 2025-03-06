@@ -53,6 +53,7 @@ const foodTruckIcon = L.icon({
 });
 let isSignupMode = true;
 let authType = null;
+const PRICE_MARKUP = 1.15; // 15% markup
 
 // Initialize Leaflet map with OpenStreetMap
 console.log("Attempting to load map...");
@@ -205,13 +206,13 @@ if (authSubmit) {
           endPeriod: document.getElementById('endPeriod').value,
           specials: document.getElementById('specials').value,
           approved: false,
-          productPhotos: []
+          productPhotos: [],
+          menu: []
         });
         await db.collection('vendors').doc(user.uid).set(userData);
         await uploadInitialPhotos(user.uid);
         console.log("Vendor signed up:", user.uid);
       } else {
-        userData.visitedTrucks = {};
         userData.points = 0;
         userData.badges = [];
         userData.coupons = {};
@@ -316,7 +317,29 @@ function showDashboard(vendorData) {
   document.getElementById('dash-endPeriod').value = vendorData.endPeriod || 'PM';
   document.getElementById('dash-description').value = vendorData.description || '';
   document.getElementById('dash-specials').value = vendorData.specials || '';
+  const menuItemsDiv = document.getElementById('menu-items');
+  menuItemsDiv.innerHTML = '';
+  (vendorData.menu || []).forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'menu-item';
+    div.innerHTML = `
+      <input type="text" placeholder="Item Name" class="menu-name" value="${item.name}">
+      <input type="number" placeholder="Price ($)" class="menu-price" step="0.01" value="${item.price}">
+    `;
+    menuItemsDiv.appendChild(div);
+  });
   initializeDashAutocomplete();
+}
+
+function addMenuItem() {
+  const menuItemsDiv = document.getElementById('menu-items');
+  const div = document.createElement('div');
+  div.className = 'menu-item';
+  div.innerHTML = `
+    <input type="text" placeholder="Item Name" class="menu-name">
+    <input type="number" placeholder="Price ($)" class="menu-price" step="0.01">
+  `;
+  menuItemsDiv.appendChild(div);
 }
 
 if (updateProfileBtn) {
@@ -340,6 +363,10 @@ if (updateProfileBtn) {
         coords.latitude = existingData.latitude;
         coords.longitude = existingData.longitude;
       }
+      const menuItems = Array.from(document.querySelectorAll('.menu-item')).map(item => ({
+        name: item.querySelector('.menu-name').value,
+        price: parseFloat(item.querySelector('.menu-price').value) || 0
+      })).filter(item => item.name && item.price > 0);
       const updatedData = {
         name: document.getElementById('dash-name').value,
         foodType: document.getElementById('dash-foodType').value,
@@ -353,6 +380,7 @@ if (updateProfileBtn) {
         endPeriod: document.getElementById('dash-endPeriod').value,
         specials: document.getElementById('dash-specials').value,
         description: document.getElementById('dash-description').value,
+        menu: menuItems,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       };
       await db.collection('vendors').doc(userId).update(updatedData);
@@ -488,7 +516,7 @@ truckSearch.oninput = debounce(updateTruckList, 300);
 foodTypeFilter.onchange = updateTruckList;
 statusFilter.onchange = updateTruckList;
 
-// Business page with ratings and reviews
+// Business page with ratings, orders, and reviews
 async function showBusinessPage(pin) {
   const businessPage = document.getElementById('business-page');
   const businessActions = document.getElementById('business-actions');
@@ -524,6 +552,7 @@ async function showBusinessPage(pin) {
       <button id="submit-rating">Submit</button>
     </div>
     <button onclick="markVisited('${pin.id}')">Mark as Visited</button>
+    <button onclick="showOrderModal('${pin.id}', '${pin.name}')">Order Now</button>
   `;
   
   const submitBtn = document.getElementById('submit-rating');
@@ -539,7 +568,7 @@ async function showBusinessPage(pin) {
       const userId = auth.currentUser.uid;
       const existingReview = await db.collection('ratings').where('pinId', '==', pin.id).where('userId', '==', userId).get();
       if (!existingReview.empty) {
-        submitBtn.disabled = true;
+        submitBtn.disabled = false;
         submitBtn.textContent = "See What Others Are Saying";
         submitBtn.onclick = () => showReviews(pin);
       } else {
@@ -583,7 +612,7 @@ async function submitRating(pinId) {
     });
     console.log("Rating submitted for pin:", pinId);
     alert("Rating submitted successfully!");
-    document.getElementById('submit-rating').disabled = true;
+    document.getElementById('submit-rating').disabled = false;
     document.getElementById('submit-rating').textContent = "See What Others Are Saying";
     document.getElementById('submit-rating').onclick = () => showReviews({ id: pinId, name: document.getElementById('page-name').textContent });
   } catch (error) {
@@ -627,10 +656,25 @@ async function markVisited(pinId) {
     alert("Only customers can mark visits. Create a customer account.");
     return;
   }
+  const visitRef = db.collection('customers').doc(userId).collection('visits').doc(pinId);
+  const visitDoc = await visitRef.get();
+  const now = new Date().getTime();
+  const oneDay = 24 * 60 * 60 * 1000;
+
+  if (visitDoc.exists && (now - visitDoc.data().timestamp.toMillis()) < oneDay) {
+    alert("You can only mark a visit once per day per truck.");
+    return;
+  }
+
+  await visitRef.set({
+    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+    pinId
+  });
+
   const visitedTrucks = customerDoc.data().visitedTrucks || {};
   visitedTrucks[pinId] = (visitedTrucks[pinId] || 0) + 1;
   const points = customerDoc.data().points || 0;
-  const newPoints = points + (visitedTrucks[pinId] === 1 ? 10 : 0); // 10 points for first visit only
+  const newPoints = visitDoc.exists ? points : points + 10; // Only award points on first visit
   let badges = customerDoc.data().badges || [];
   const totalVisits = Object.values(visitedTrucks).reduce((sum, count) => sum + count, 0);
   if (totalVisits >= 30 && !badges.includes("Foodie Legend")) badges.push("Foodie Legend");
@@ -650,6 +694,83 @@ async function markVisited(pinId) {
   });
   console.log("Truck marked as visited:", pinId);
   loadVisitedTrucks(userId);
+  loadTruckTrek(userId);
+}
+
+async function showOrderModal(pinId, truckName) {
+  const orderModal = document.getElementById('order-modal');
+  const orderMenu = document.getElementById('order-menu');
+  document.getElementById('order-truck-name').textContent = truckName;
+  orderMenu.innerHTML = '';
+
+  const pinDoc = await db.collection('pins').doc(pinId).get();
+  const menu = pinDoc.data().menu || [];
+  if (menu.length === 0) {
+    orderMenu.innerHTML = '<p>No menu items available.</p>';
+  } else {
+    menu.forEach((item, index) => {
+      const adjustedPrice = (item.price * PRICE_MARKUP).toFixed(2);
+      const div = document.createElement('div');
+      div.className = 'menu-item';
+      div.innerHTML = `
+        <p>${item.name} - $${adjustedPrice}</p>
+        <select id="quantity-${index}">
+          <option value="0">0</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+        </select>
+      `;
+      orderMenu.appendChild(div);
+    });
+  }
+
+  document.getElementById('place-order').onclick = () => placeOrder(pinId, truckName, menu);
+  orderModal.style.display = 'block';
+}
+
+async function placeOrder(pinId, truckName, menu) {
+  if (!auth.currentUser) {
+    alert("Please log in as a customer to place an order.");
+    return;
+  }
+  const userId = auth.currentUser.uid;
+  const customerDoc = await db.collection('customers').doc(userId).get();
+  if (!customerDoc.exists) {
+    alert("Only customers can place orders. Create a customer account.");
+    return;
+  }
+
+  const orderItems = menu.map((item, index) => {
+    const quantity = parseInt(document.getElementById(`quantity-${index}`).value);
+    return quantity > 0 ? { name: item.name, price: item.price * PRICE_MARKUP, quantity } : null;
+  }).filter(item => item);
+
+  if (orderItems.length === 0) {
+    alert("Please select at least one item to order.");
+    return;
+  }
+
+  const total = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2);
+  const order = {
+    pinId,
+    truckName,
+    userId,
+    customerName: customerDoc.data().name,
+    items: orderItems,
+    total,
+    status: 'pending',
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  const orderRef = await db.collection('orders').add(order);
+  await db.collection('customers').doc(userId).update({
+    points: firebase.firestore.FieldValue.increment(5),
+    lastOrderId: orderRef.id
+  });
+  console.log("Order placed:", orderRef.id);
+  alert(`Order placed successfully! Total: $${total}`);
+  document.getElementById('order-modal').style.display = 'none';
   loadTruckTrek(userId);
 }
 
