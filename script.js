@@ -9,7 +9,17 @@ const firebaseConfig = {
   appId: "1:435856449927:web:021d6dae14a84320627322",
 };
 
-let db, storage, auth;
+let db, storage, auth, map, clusterGroup, allPins = [], userCoords = { lat: 51.505, lng: -0.09 };
+const foodTruckIcon = L.icon({
+  iconUrl: 'https://cdn-icons-png.flaticon.com/512/1048/1048313.png',
+  iconSize: [38, 38],
+  iconAnchor: [19, 38],
+  popupAnchor: [0, -38]
+});
+let vendorSignupMode = true, customerSignupMode = true;
+const PRICE_MARKUP = 1.15;
+
+// Initialize Firebase
 if (typeof firebase !== 'undefined') {
   try {
     firebase.initializeApp(firebaseConfig);
@@ -22,54 +32,70 @@ if (typeof firebase !== 'undefined') {
   }
 }
 
-let map, clusterGroup, allPins = [], userCoords = { lat: 51.505, lng: -0.09 };
-const foodTruckIcon = L.icon({
-  iconUrl: 'https://cdn-icons-png.flaticon.com/512/1048/1048313.png',
-  iconSize: [38, 38],
-  iconAnchor: [19, 38],
-  popupAnchor: [0, -38]
-});
-let vendorSignupMode = true, customerSignupMode = true;
-const PRICE_MARKUP = 1.15;
-
 // Initialize map
+function initMap() {
+  map = L.map('map').setView([userCoords.lat, userCoords.lng], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
+  }).addTo(map);
+  clusterGroup = L.markerClusterGroup();
+  map.addLayer(clusterGroup);
+}
+
 navigator.geolocation.getCurrentPosition(position => {
   userCoords = { lat: position.coords.latitude, lng: position.coords.longitude };
   console.log("Geolocation success:", userCoords.lat, userCoords.lng);
-  map = L.map('map').setView([userCoords.lat, userCoords.lng], 13);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
-  }).addTo(map);
-  clusterGroup = L.markerClusterGroup();
-  map.addLayer(clusterGroup);
+  initMap();
   loadPins();
 }, () => {
   console.log("Geolocation failed, using fallback location");
-  map = L.map('map').setView([userCoords.lat, userCoords.lng], 13);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
-  }).addTo(map);
-  clusterGroup = L.markerClusterGroup();
-  map.addLayer(clusterGroup);
+  initMap();
   loadPins();
 });
 
+// UI Helpers
+function showLoadingOverlay() {
+  const overlay = document.getElementById('loading-overlay');
+  overlay.classList.remove('hidden');
+  overlay.classList.add('active');
+  document.getElementById('main-content').classList.add('hidden');
+}
+
+function hideLoadingOverlay() {
+  const overlay = document.getElementById('loading-overlay');
+  overlay.classList.remove('active');
+  setTimeout(() => {
+    overlay.classList.add('hidden');
+    document.getElementById('main-content').classList.remove('hidden');
+  }, 300);
+}
+
+function closeModal(modalId) {
+  document.getElementById(modalId).classList.add('hidden');
+  hideLoadingOverlay();
+}
+
 // Auth handling
-document.getElementById('vendor-btn').onclick = async () => {
+document.getElementById('vendor-btn').onclick = () => {
   showLoadingOverlay();
   if (auth.currentUser) {
-    const vendorDoc = await db.collection('vendors').doc(auth.currentUser.uid).get();
-    if (vendorDoc.exists && vendorDoc.data().approved) {
-      showVendorDashboard(vendorDoc.data());
-    } else {
-      document.getElementById('vendor-modal').classList.remove('hidden');
-      updateVendorAuthMode();
-    }
+    db.collection('vendors').doc(auth.currentUser.uid).get().then(doc => {
+      if (doc.exists && doc.data().approved) {
+        showVendorDashboard(doc.data());
+      } else {
+        document.getElementById('vendor-modal').classList.remove('hidden');
+        updateVendorAuthMode();
+      }
+      hideLoadingOverlay();
+    }).catch(error => {
+      console.error("Error fetching vendor data:", error);
+      hideLoadingOverlay();
+    });
   } else {
     document.getElementById('vendor-modal').classList.remove('hidden');
     updateVendorAuthMode();
+    hideLoadingOverlay();
   }
-  hideLoadingOverlay();
 };
 
 document.getElementById('customer-btn').onclick = () => {
@@ -200,6 +226,10 @@ document.getElementById('vendor-submit').onclick = async () => {
     } else {
       const userCredential = await auth.signInWithEmailAndPassword(email, password);
       user = userCredential.user;
+      const vendorDoc = await db.collection('vendors').doc(user.uid).get();
+      if (vendorDoc.exists && vendorDoc.data().approved) {
+        showVendorDashboard(vendorDoc.data());
+      }
     }
     document.getElementById('vendor-modal').classList.add('hidden');
   } catch (error) {
@@ -214,10 +244,9 @@ document.getElementById('customer-submit').onclick = async () => {
   const email = document.getElementById('customer-email').value;
   const password = document.getElementById('customer-password').value;
   try {
-    let user;
     if (customerSignupMode) {
       const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-      user = userCredential.user;
+      const user = userCredential.user;
       const customerData = {
         email,
         name: document.getElementById('customer-name').value,
@@ -228,8 +257,7 @@ document.getElementById('customer-submit').onclick = async () => {
       };
       await db.collection('customers').doc(user.uid).set(customerData);
     } else {
-      const userCredential = await auth.signInWithEmailAndPassword(email, password);
-      user = userCredential.user;
+      await auth.signInWithEmailAndPassword(email, password);
     }
     document.getElementById('customer-modal').classList.add('hidden');
   } catch (error) {
@@ -251,6 +279,7 @@ auth.onAuthStateChanged(async user => {
     if (vendorDoc.exists) {
       vendorBtn.textContent = vendorDoc.data().approved ? "Dashboard" : "Vendor Portal (Pending Approval)";
       if (vendorDoc.data().approved) {
+        document.getElementById('vendor-modal').classList.add('hidden');
         showVendorDashboard(vendorDoc.data());
       }
     } else {
@@ -263,8 +292,8 @@ auth.onAuthStateChanged(async user => {
     customerBtn.textContent = "Foodie Hub";
     document.getElementById('vendor-dashboard').classList.add('hidden');
   }
+  initializeLocationAutocomplete();
   hideLoadingOverlay();
-  initializeLocationAutocomplete(); // Ensure filters are ready
 });
 
 document.getElementById('logout').onclick = async () => {
@@ -273,16 +302,6 @@ document.getElementById('logout').onclick = async () => {
   console.log("User logged out");
   hideLoadingOverlay();
 };
-
-function showLoadingOverlay() {
-  document.getElementById('loading-overlay').classList.remove('hidden');
-  document.getElementById('loading-overlay').classList.add('active');
-}
-
-function hideLoadingOverlay() {
-  document.getElementById('loading-overlay').classList.remove('active');
-  setTimeout(() => document.getElementById('loading-overlay').classList.add('hidden'), 300);
-}
 
 async function loadPins() {
   db.collection('pins').onSnapshot(async snapshot => {
@@ -300,6 +319,7 @@ async function loadPins() {
   db.collection('pins').get().then(snapshot => {
     const foodTypes = [...new Set(snapshot.docs.map(doc => doc.data().foodType))];
     const filter = document.getElementById('food-type-filter');
+    filter.innerHTML = '<option value="">All Food Types</option>';
     foodTypes.forEach(type => {
       const option = document.createElement('option');
       option.value = type;
@@ -327,7 +347,7 @@ function updateTruckList() {
     const matchesFoodType = !foodType || pin.foodType === foodType;
     const matchesStatus = !status || (status === 'live' ? pin.live : !pin.live);
     const distance = getDistance(userCoords.lat, userCoords.lng, pin.latitude, pin.longitude);
-    return matchesSearch && matchesFoodType && matchesStatus && distance < 50; // 50km radius
+    return matchesSearch && matchesFoodType && matchesStatus && distance < 50;
   });
 
   const truckList = document.getElementById('truck-list');
@@ -376,6 +396,7 @@ document.getElementById('food-type-filter').onchange = updateTruckList;
 document.getElementById('status-filter').onchange = updateTruckList;
 
 async function showBusinessPage(pin) {
+  showLoadingOverlay();
   const businessPage = document.getElementById('business-page');
   const actions = document.getElementById('business-actions');
   document.getElementById('page-name').textContent = pin.name;
@@ -459,10 +480,11 @@ async function showBusinessPage(pin) {
 
   document.getElementById('view-reviews').onclick = () => showReviews(pin);
   businessPage.classList.remove('hidden');
+  hideLoadingOverlay();
 }
 
 function closeBusinessPage() {
-  document.getElementById('business-page').classList.add('hidden');
+  closeModal('business-page');
 }
 
 async function submitRating(pinId) {
@@ -493,6 +515,7 @@ async function submitRating(pinId) {
 }
 
 async function showReviews(pin) {
+  showLoadingOverlay();
   const reviewsModal = document.getElementById('reviews-modal');
   const reviewList = document.getElementById('review-list');
   document.getElementById('review-truck-name').textContent = pin.name;
@@ -517,12 +540,15 @@ async function showReviews(pin) {
     });
   }
   reviewsModal.classList.remove('hidden');
+  hideLoadingOverlay();
 }
 
 async function showVisitModal(pinId, truckName) {
+  showLoadingOverlay();
   document.getElementById('visit-truck-name').textContent = truckName;
   document.getElementById('submit-visit').onclick = () => markVisited(pinId);
   document.getElementById('visit-modal').classList.remove('hidden');
+  hideLoadingOverlay();
 }
 
 async function markVisited(pinId) {
@@ -572,10 +598,11 @@ async function markVisited(pinId) {
 
   await db.collection('customers').doc(userId).update({ visitedTrucks, points: newPoints, badges, coupons });
   alert("Visit marked successfully! +20 points");
-  document.getElementById('visit-modal').classList.add('hidden');
+  closeModal('visit-modal');
 }
 
 async function showOrderModal(pinId, truckName, menuJson) {
+  showLoadingOverlay();
   const orderModal = document.getElementById('order-modal');
   const orderMenu = document.getElementById('order-menu');
   document.getElementById('order-truck-name').textContent = truckName;
@@ -604,6 +631,7 @@ async function showOrderModal(pinId, truckName, menuJson) {
 
   document.getElementById('place-order').onclick = () => placeOrder(pinId, truckName, menu);
   orderModal.classList.remove('hidden');
+  hideLoadingOverlay();
 }
 
 async function placeOrder(pinId, truckName, menu) {
@@ -613,7 +641,7 @@ async function placeOrder(pinId, truckName, menu) {
   if (!customerDoc.exists) return alert("Only customers can place orders.");
 
   const orderItems = menu.map((item, index) => {
-    const quantity = parseInt(document.getElementById(`order-quantity-${index}`).value) || parseInt(document.getElementById(`cart-quantity-${index}`).value);
+    const quantity = parseInt(document.getElementById(`order-quantity-${index}`)?.value) || parseInt(document.getElementById(`cart-quantity-${index}`).value);
     return quantity > 0 ? { name: item.name, price: item.price * PRICE_MARKUP, quantity } : null;
   }).filter(item => item);
 
@@ -637,7 +665,7 @@ async function placeOrder(pinId, truckName, menu) {
     lastOrderId: orderRef.id
   });
   alert(`Order placed successfully! Total: $${total} (+10 points)`);
-  document.getElementById('order-modal').classList.add('hidden');
+  closeModal('order-modal');
 }
 
 function addMenuItem() {
@@ -652,6 +680,7 @@ function addMenuItem() {
 }
 
 function showVendorDashboard(vendorData) {
+  showLoadingOverlay();
   const dashboard = document.getElementById('vendor-dashboard');
   document.getElementById('dash-name').value = vendorData.name || '';
   document.getElementById('dash-bio').value = vendorData.bio || '';
@@ -683,6 +712,7 @@ function showVendorDashboard(vendorData) {
   document.getElementById('update-profile').onclick = () => updateVendorProfile(auth.currentUser.uid);
   initializeDashAutocomplete();
   dashboard.classList.remove('hidden');
+  hideLoadingOverlay();
 }
 
 async function toggleLiveStatus(userId, isLive) {
