@@ -26,7 +26,7 @@
       z-index: 1000;
     }
     .btn-primary {
-      background: #ff385c; /* Airbnb pink */
+      background: #ff385c;
       color: white;
       padding: 0.75rem 1.5rem;
       border-radius: 9999px;
@@ -84,10 +84,31 @@
       border-color: #ff385c;
       outline: none;
     }
+    #loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    #loading-overlay.active {
+      opacity: 1;
+    }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+  <div id="loading-overlay" class="hidden">
+    <i class="fas fa-spinner fa-spin text-white text-4xl"></i>
+  </div>
+
   <header class="py-4 px-6 flex justify-between items-center">
     <h1 class="text-2xl font-bold text-gray-900">Streats Live</h1>
     <nav class="flex space-x-4">
@@ -100,6 +121,7 @@
   <main class="container mx-auto pt-24 pb-12 px-6">
     <section class="mb-12">
       <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
+        <input type="text" id="location-filter" placeholder="Near Me" class="flex-1">
         <input type="text" id="truck-search" placeholder="Search food trucks..." class="flex-1">
         <select id="food-type-filter" class="w-full md:w-1/4">
           <option value="">All Food Types</option>
@@ -122,6 +144,8 @@
     <input type="password" id="vendor-password" placeholder="Password" required class="mb-6">
     <div id="vendor-signup-fields" class="hidden space-y-4">
       <input type="text" id="vendor-name" placeholder="Business Name" required>
+      <textarea id="vendor-bio" placeholder="Bio" rows="3" required></textarea>
+      <input type="text" id="vendor-phone" placeholder="Business Phone Number" required>
       <input type="text" id="vendor-foodType" placeholder="Food Type (e.g., Tacos)" required>
       <input type="text" id="vendor-contact" placeholder="Contact Info" required>
       <input type="text" id="vendor-address" placeholder="Address" required>
@@ -164,6 +188,8 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div>
         <input type="text" id="dash-name" placeholder="Business Name" class="mb-4">
+        <textarea id="dash-bio" placeholder="Bio" rows="3" class="mb-4"></textarea>
+        <input type="text" id="dash-phone" placeholder="Business Phone Number" class="mb-4">
         <input type="text" id="dash-foodType" placeholder="Food Type" class="mb-4">
         <input type="text" id="dash-contact" placeholder="Contact Info" class="mb-4">
         <input type="text" id="dash-address" placeholder="Address" class="mb-4">
@@ -213,7 +239,9 @@
       </div>
       <div>
         <h3 class="text-xl font-semibold text-gray-900 mb-4">Vendor</h3>
-        <p id="page-vendor" class="text-gray-700 mb-4"></p>
+        <p id="page-vendor-name" class="text-gray-700 mb-2"></p>
+        <p id="page-vendor-bio" class="text-gray-700 mb-2"></p>
+        <p id="page-vendor-phone" class="text-gray-700 mb-4"></p>
         <div id="business-actions" class="space-y-4 mb-6"></div>
         <button id="view-reviews" class="btn-primary w-full">See Reviews</button>
       </div>
