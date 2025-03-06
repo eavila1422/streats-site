@@ -1,530 +1,217 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Streats Live</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <style>
-    body { 
-      margin: 0; 
-      font-family: 'Inter', sans-serif; 
-      background: #0f0f0f; 
-      color: #d4d4d4; 
-      overflow-x: hidden; 
-    }
-    .container { 
-      display: flex; 
-      min-height: 100vh; 
-    }
-    #sidebar { 
-      width: 250px; 
-      background: #171717; 
-      padding: 15px; 
-      transition: width 0.3s ease; 
-      position: fixed; 
-      height: 100%; 
-      z-index: 1000; 
-    }
-    #sidebar.hidden { 
-      width: 60px; 
-    }
-    #sidebar-toggle { 
-      position: fixed; 
-      top: 10px; 
-      left: 270px; 
-      background: transparent; 
-      color: #00d4ff; 
-      border: 1px solid #00d4ff; 
-      padding: 6px 10px; 
-      border-radius: 4px; 
-      cursor: pointer; 
-      z-index: 1001; 
-      transition: left 0.3s ease, background 0.2s; 
-    }
-    #sidebar-toggle.hidden { 
-      left: 70px; 
-    }
-    #sidebar-toggle:hover { 
-      background: #00d4ff; 
-      color: #0f0f0f; 
-    }
-    #sidebar .user-info { 
-      text-align: center; 
-      margin-bottom: 20px; 
-    }
-    #sidebar .user-info h2 { 
-      color: #00d4ff; 
-      font-size: 1.4em; 
-      margin: 8px 0; 
-      white-space: nowrap; 
-    }
-    #sidebar button { 
-      background: none; 
-      color: #d4d4d4; 
-      border: none; 
-      padding: 12px; 
-      width: 100%; 
-      text-align: left; 
-      border-radius: 4px; 
-      cursor: pointer; 
-      font-size: 0.95em; 
-      margin: 5px 0; 
-      transition: background 0.2s, color 0.2s; 
-      display: flex; 
-      align-items: center; 
-    }
-    #sidebar.hidden button { 
-      text-align: center; 
-      padding: 12px 0; 
-    }
-    #sidebar.hidden button span { 
-      display: none; 
-    }
-    #sidebar.hidden button i { 
-      margin: 0; 
-    }
-    #sidebar button:hover { 
-      background: #00d4ff; 
-      color: #0f0f0f; 
-    }
-    #visited-trucks { 
-      margin-top: 20px; 
-    }
-    #visited-trucks h3 { 
-      color: #00d4ff; 
-      font-size: 1.2em; 
-      margin-bottom: 10px; 
-    }
-    #visited-trucks ul { 
-      list-style: none; 
-      padding: 0; 
-    }
-    #visited-trucks li { 
-      background: #222; 
-      padding: 8px; 
-      margin: 5px 0; 
-      border-radius: 4px; 
-      display: flex; 
-      justify-content: space-between; 
-      align-items: center; 
-    }
-    #visited-trucks .tier { 
-      font-size: 0.8em; 
-      color: #ff4081; 
-    }
-    #truck-trek { 
-      margin-top: 20px; 
-      text-align: center; 
-    }
-    #truck-trek p { 
-      margin: 5px 0; 
-      font-size: 0.9em; 
-    }
-    #truck-trek .points { 
-      color: #00d4ff; 
-      font-weight: bold; 
-    }
-    #truck-trek .badge { 
-      color: #ff4081; 
-      font-style: italic; 
-    }
-    #content { 
-      flex: 1; 
-      padding: 20px; 
-      margin-left: 250px; 
-      transition: margin-left 0.3s ease; 
-    }
-    #content.full { 
-      margin-left: 60px; 
-    }
-    .hero { 
-      background: url('https://images.unsplash.com/photo-1502741126169-bcc99683ed8f?q=80&w=1200&auto=format&fit=crop') no-repeat center/cover; 
-      height: 50vh; 
-      display: flex; 
-      align-items: center; 
-      justify-content: center; 
-      text-align: center; 
-      color: #fff; 
-      position: relative; 
-    }
-    .hero-content { 
-      background: rgba(0, 0, 0, 0.5); 
-      padding: 20px; 
-      border-radius: 8px; 
-    }
-    .hero h1 { 
-      color: #00d4ff; 
-      font-size: 2.5em; 
-      margin-bottom: 10px; 
-    }
-    .hero p { 
-      font-size: 1.2em; 
-    }
-    .hero button { 
-      background: #00d4ff; 
-      color: #0f0f0f; 
-      padding: 10px 20px; 
-      border: none; 
-      border-radius: 4px; 
-      cursor: pointer; 
-      margin-top: 10px; 
-    }
-    .hero button:hover { 
-      background: #ff4081; 
-    }
-    .search-filter { 
-      display: flex; 
-      gap: 10px; 
-      margin: 20px 0; 
-    }
-    .search-filter input, .search-filter select { 
-      padding: 8px; 
-      border: 1px solid #2a2a2a; 
-      border-radius: 4px; 
-      background: #222; 
-      color: #d4d4d4; 
-      flex: 1; 
-    }
-    #map { 
-      height: 60vh; 
-      width: 100%; 
-      border-radius: 8px; 
-      box-shadow: 0 0 8px rgba(0, 212, 255, 0.1); 
-      margin-bottom: 20px; 
-      background: #171717; 
-    }
-    #truck-list { 
-      display: grid; 
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
-      gap: 15px; 
-      max-height: 40vh; 
-      overflow-y: auto; 
-    }
-    .truck-card { 
-      background: #171717; 
-      padding: 15px; 
-      border-radius: 8px; 
-      cursor: pointer; 
-      transition: transform 0.2s; 
-    }
-    .truck-card:hover { 
-      transform: scale(1.02); 
-    }
-    .truck-card.live { 
-      border: 2px solid #00d4ff; 
-    }
-    .truck-card .rating-info { 
-      font-size: 0.8em; 
-      color: #ff4081; 
-    }
-    #auth-modal, #dashboard, #reviews-modal, #order-modal { 
-      display: none; 
-      background: #171717; 
-      padding: 30px; 
-      border-radius: 8px; 
-      box-shadow: 0 0 12px rgba(0, 212, 255, 0.15); 
-      max-width: 600px; 
-      margin: 0 auto 20px; 
-      animation: slideIn 0.3s ease; 
-      position: fixed; 
-      top: 50%; 
-      left: 50%; 
-      transform: translate(-50%, -50%); 
-      z-index: 1000; 
-    }
-    @keyframes slideIn { 
-      from { opacity: 0; transform: translate(-50%, -60%); } 
-      to { opacity: 1; transform: translate(-50%, -50%); } 
-    }
-    #auth-modal input, #dashboard input, #dashboard textarea, #dashboard select, #reviews-modal textarea, #order-modal select { 
-      width: 100%; 
-      padding: 10px; 
-      margin: 6px 0; 
-      border: 1px solid #2a2a2a; 
-      border-radius: 4px; 
-      background: #222; 
-      color: #d4d4d4; 
-      font-size: 0.9em; 
-      transition: border-color 0.2s; 
-    }
-    #auth-modal input:focus, #dashboard input:focus, #dashboard textarea:focus, #dashboard select:focus, #reviews-modal textarea:focus, #order-modal select:focus { 
-      border-color: #00d4ff; 
-      outline: none; 
-    }
-    #dashboard textarea, #reviews-modal textarea { 
-      height: 90px; 
-      resize: vertical; 
-    }
-    #auth-modal button, #dashboard button, #reviews-modal button, #order-modal button { 
-      background: #00d4ff; 
-      color: #0f0f0f; 
-      border: none; 
-      padding: 10px; 
-      width: 100%; 
-      border-radius: 4px; 
-      cursor: pointer; 
-      font-size: 0.95em; 
-      margin-top: 6px; 
-      transition: background 0.2s, transform 0.1s; 
-    }
-    #auth-modal button:hover, #dashboard button:hover, #reviews-modal button:hover, #order-modal button:hover { 
-      background: #ff4081; 
-      transform: translateY(-1px); 
-    }
-    .time-group { 
-      display: flex; 
-      gap: 6px; 
-    }
-    .time-group input { 
-      width: 65%; 
-    }
-    .time-group select { 
-      width: 35%; 
-    }
-    #address-preview, #dash-address-preview { 
-      font-size: 0.8em; 
-      color: #00d4ff; 
-      margin-top: 4px; 
-    }
-    #business-page { 
-      display: none; 
-      position: fixed; 
-      top: 50%; 
-      left: 50%; 
-      transform: translate(-50%, -50%); 
-      background: #171717; 
-      padding: 30px; 
-      border-radius: 8px; 
-      box-shadow: 0 0 12px rgba(0, 212, 255, 0.15); 
-      max-width: 700px; 
-      z-index: 1000; 
-      animation: slideIn 0.3s ease; 
-    }
-    #business-page h2 { 
-      color: #00d4ff; 
-      margin-bottom: 12px; 
-    }
-    #business-page p { 
-      margin: 6px 0; 
-      font-size: 0.95em; 
-    }
-    #business-page img { 
-      max-width: 100%; 
-      border-radius: 4px; 
-      margin: 8px 0; 
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2); 
-    }
-    #business-page .rating { 
-      margin: 10px 0; 
-    }
-    #business-page .rating select { 
-      padding: 5px; 
-      background: #222; 
-      color: #d4d4d4; 
-      border: 1px solid #2a2a2a; 
-      border-radius: 4px; 
-    }
-    #business-page button { 
-      background: #00d4ff; 
-      color: #0f0f0f; 
-      border: none; 
-      padding: 8px 16px; 
-      border-radius: 4px; 
-      cursor: pointer; 
-      margin: 5px; 
-      transition: background 0.2s; 
-    }
-    #business-page button:hover { 
-      background: #ff4081; 
-    }
-    #reviews-modal .review { 
-      border-bottom: 1px solid #2a2a2a; 
-      padding: 10px 0; 
-    }
-    #reviews-modal .review:last-child { 
-      border-bottom: none; 
-    }
-    #reviews-modal .rating-score { 
-      color: #ff4081; 
-      font-weight: bold; 
-    }
-    #dashboard .menu-item { 
-      margin: 10px 0; 
-      display: flex; 
-      gap: 10px; 
-    }
-    #order-modal .menu-item { 
-      margin: 10px 0; 
-    }
-    #about { 
-      background: #171717; 
-      padding: 30px; 
-      border-radius: 8px; 
-      box-shadow: 0 0 8px rgba(0, 212, 255, 0.1); 
-      text-align: left; 
-    }
-    #about h2 { 
-      color: #00d4ff; 
-      font-size: 1.6em; 
-      margin-bottom: 12px; 
-    }
-    #about p { 
-      font-size: 0.95em; 
-      margin-bottom: 8px; 
-    }
-    @media (max-width: 768px) {
-      #sidebar { width: 200px; }
-      #sidebar.hidden { width: 0; padding: 0; }
-      #sidebar-toggle { left: 10px; }
-      #sidebar-toggle.hidden { left: 10px; }
-      #content { margin-left: 0; padding: 10px; }
-      #content.full { margin-left: 0; }
-      .search-filter { flex-direction: column; }
-      .hero { height: 40vh; }
-      #map { height: 50vh; }
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      overflow-x: hidden;
+    }
+    .navbar {
+      background: linear-gradient(90deg, #00d4ff, #ff4081);
+      padding: 1rem;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+    .navbar button {
+      transition: transform 0.2s, background 0.3s;
+    }
+    .navbar button:hover {
+      transform: scale(1.05);
+      background: #ffffff20;
+    }
+    #map {
+      height: 70vh;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
+      background: #171717;
+    }
+    .modal {
+      animation: slideIn 0.3s ease;
+      background: #171717;
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .truck-card {
+      transition: transform 0.2s, box-shadow 0.3s;
+    }
+    .truck-card:hover {
+      transform: scale(1.03);
+      box-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
+    }
+    .btn-primary {
+      background: #00d4ff;
+      color: #0a0a0a;
+      transition: background 0.3s;
+    }
+    .btn-primary:hover {
+      background: #ff4081;
+    }
+    .btn-secondary {
+      background: #2a2a2a;
+      color: #e0e0e0;
+      transition: background 0.3s;
+    }
+    .btn-secondary:hover {
+      background: #404040;
     }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div class="container">
-    <button id="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
-    <div id="sidebar" class="hidden">
-      <div class="user-info">
-        <h2 id="sidebar-name"></h2>
-        <p id="sidebar-status"></p>
-      </div>
-      <button id="vendor-auth-btn"><i class="fas fa-truck"></i> <span>Put My Truck on the Map</span></button>
-      <button id="customer-auth-btn"><i class="fas fa-utensils"></i> <span>Join the Foodie Frenzy!</span></button>
-      <button id="dashboard-btn" style="display: none;"><i class="fas fa-tachometer-alt"></i> <span>Dashboard</span></button>
-      <button id="logout" style="display: none;"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></button>
-      <div id="visited-trucks" style="display: none;">
-        <h3>Your Truck Rankings</h3>
-        <ul id="visited-list"></ul>
-      </div>
-      <div id="truck-trek" style="display: none;">
-        <p><span class="points" id="trek-points">0</span> Points</p>
-        <p>Badge: <span class="badge" id="trek-badge">Newbie</span></p>
-      </div>
+  <nav class="navbar flex justify-between items-center px-6">
+    <h1 class="text-2xl font-bold text-white">Streats Live</h1>
+    <div class="space-x-4">
+      <button id="vendor-btn" class="btn-primary px-4 py-2 rounded-lg">Vendor Portal</button>
+      <button id="customer-btn" class="btn-primary px-4 py-2 rounded-lg">Foodie Hub</button>
+      <button id="logout" class="btn-secondary px-4 py-2 rounded-lg hidden">Logout</button>
     </div>
-    <div id="content" class="full">
-      <section class="hero">
-        <div class="hero-content">
-          <h1>Streats Live</h1>
-          <p>Discover local food trucks in real-time</p>
-          <button onclick="document.getElementById('map').scrollIntoView()">Find Trucks Now</button>
-        </div>
-      </section>
-      <div class="search-filter">
-        <input type="text" id="truck-search" placeholder="Search food trucks...">
-        <select id="food-type-filter">
-          <option value="">All Food Types</option>
-        </select>
-        <select id="status-filter">
-          <option value="">All Status</option>
-          <option value="live" selected>Live Now</option>
-          <option value="offline">Offline</option>
-        </select>
-      </div>
-      <div id="map"></div>
-      <div id="truck-list" class="truck-grid"></div>
-      <div id="auth-modal">
-        <h2 id="auth-title">Sign Up</h2>
-        <input type="email" id="email" placeholder="Email" required><br>
-        <input type="password" id="password" placeholder="Password" required><br>
-        <div id="signup-fields" style="display: none;">
-          <input type="text" id="name" placeholder="Name (Customer) or Business Name (Vendor)" required><br>
-          <div id="vendor-fields" style="display: none;">
-            <input type="text" id="foodType" placeholder="Food Type (e.g., Tacos)" required><br>
-            <input type="text" id="contact" placeholder="Contact Info" required><br>
-            <input type="text" id="address" placeholder="Start typing address..." required><br>
-            <div id="address-preview"></div>
-            <div class="time-group">
-              <input type="text" id="startTime" placeholder="Start (e.g., 9:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$" required>
-              <select id="startPeriod" required>
-                <option value="AM">AM</option>
-                <option value="PM">PM</option>
-              </select>
-            </div>
-            <div class="time-group">
-              <input type="text" id="endTime" placeholder="End (e.g., 5:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$" required>
-              <select id="endPeriod" required>
-                <option value="AM">AM</option>
-                <option value="PM">PM</option>
-              </select>
-            </div>
-            <textarea id="description" placeholder="Description" required></textarea><br>
-            <input type="text" id="specials" placeholder="Specials (e.g., Taco Tuesday)" required><br>
-            <input type="file" id="photos" accept="image/*" multiple><br>
-          </div>
-        </div>
-        <button id="auth-submit">Submit</button>
-        <p id="auth-toggle">Already have an account? <a href="#" onclick="toggleAuthMode()">Login</a></p>
-      </div>
-      <div id="dashboard">
-        <h2>Dashboard</h2>
-        <input type="text" id="dash-name" placeholder="Business Name"><br>
-        <input type="text" id="dash-foodType" placeholder="Food Type"><br>
-        <input type="text" id="dash-contact" placeholder="Contact Info"><br>
-        <input type="text" id="dash-address" placeholder="Start typing address..."><br>
-        <div id="dash-address-preview"></div>
-        <div class="time-group">
-          <input type="text" id="dash-startTime" placeholder="Start (e.g., 9:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$">
-          <select id="dash-startPeriod">
-            <option value="AM">AM</option>
-            <option value="PM">PM</option>
-          </select>
-        </div>
-        <div class="time-group">
-          <input type="text" id="dash-endTime" placeholder="End (e.g., 5:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$">
-          <select id="dash-endPeriod">
-            <option value="AM">AM</option>
-            <option value="PM">PM</option>
-          </select>
-        </div>
-        <textarea id="dash-description" placeholder="Description"></textarea><br>
-        <input type="text" id="dash-specials" placeholder="Specials"><br>
-        <input type="file" id="dash-photos" accept="image/*" multiple><br>
-        <h3>Menu</h3>
-        <div id="menu-items">
-          <div class="menu-item">
-            <input type="text" placeholder="Item Name" class="menu-name">
-            <input type="number" placeholder="Price ($)" class="menu-price" step="0.01">
-          </div>
-        </div>
-        <button onclick="addMenuItem()">Add Item</button>
-        <button id="update-profile">Update Profile</button>
-        <button id="live-toggle">Go Live</button>
-      </div>
-      <div id="reviews-modal">
-        <h2>Reviews for <span id="review-truck-name"></span></h2>
-        <div id="review-list"></div>
-        <button id="close-reviews" onclick="document.getElementById('reviews-modal').style.display = 'none'">Close</button>
-      </div>
-      <div id="order-modal">
-        <h2>Order from <span id="order-truck-name"></span></h2>
-        <div id="order-menu"></div>
-        <button id="place-order">Place Order</button>
-        <button onclick="document.getElementById('order-modal').style.display = 'none'">Cancel</button>
-      </div>
+  </nav>
+
+  <div id="main-content" class="container mx-auto p-6">
+    <div id="hero" class="text-center mb-8">
+      <h2 class="text-4xl font-bold text-white mb-4">Find Your Next Meal</h2>
+      <button onclick="document.getElementById('map').scrollIntoView({ behavior: 'smooth' })" class="btn-primary px-6 py-3 rounded-lg text-lg">Explore Trucks</button>
     </div>
-    <div id="business-page">
-      <h2 id="page-name"></h2>
-      <p id="page-foodType"></p>
-      <p id="page-contact"></p>
-      <p id="page-address"></p>
-      <p id="page-hours"></p>
-      <p id="page-description"></p>
-      <p id="page-specials"></p>
-      <div id="page-photos"></div>
-      <div id="business-actions"></div>
-      <button id="close-page" onclick="closeBusinessPage()">Close</button>
+
+    <div class="flex justify-between mb-6 space-x-4">
+      <input type="text" id="truck-search" placeholder="Search food trucks..." class="flex-1 p-3 rounded-lg bg-gray-800 border border-gray-700 focus:border-cyan-400">
+      <select id="food-type-filter" class="p-3 rounded-lg bg-gray-800 border border-gray-700">
+        <option value="">All Food Types</option>
+      </select>
+      <select id="status-filter" class="p-3 rounded-lg bg-gray-800 border border-gray-700">
+        <option value="">All Status</option>
+        <option value="live" selected>Live Now</option>
+        <option value="offline">Offline</option>
+      </select>
     </div>
+
+    <div id="map" class="mb-6"></div>
+    <div id="truck-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
   </div>
+
+  <div id="vendor-modal" class="modal hidden p-6 max-w-lg w-full">
+    <h2 class="text-2xl font-bold text-cyan-400 mb-4">Vendor Login/Sign Up</h2>
+    <input type="email" id="vendor-email" placeholder="Email" required class="mb-4">
+    <input type="password" id="vendor-password" placeholder="Password" required class="mb-4">
+    <div id="vendor-signup-fields" class="hidden">
+      <input type="text" id="vendor-name" placeholder="Business Name" required class="mb-4">
+      <input type="text" id="vendor-foodType" placeholder="Food Type (e.g., Tacos)" required class="mb-4">
+      <input type="text" id="vendor-contact" placeholder="Contact Info" required class="mb-4">
+      <input type="text" id="vendor-address" placeholder="Start typing address..." required class="mb-4">
+      <div id="vendor-address-preview" class="text-sm text-cyan-400"></div>
+      <div class="flex space-x-2 mb-4">
+        <input type="text" id="vendor-startTime" placeholder="Start (e.g., 9:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$" required class="flex-1">
+        <select id="vendor-startPeriod" required class="w-1/3">
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </select>
+      </div>
+      <div class="flex space-x-2 mb-4">
+        <input type="text" id="vendor-endTime" placeholder="End (e.g., 5:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$" required class="flex-1">
+        <select id="vendor-endPeriod" required class="w-1/3">
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </select>
+      </div>
+      <textarea id="vendor-description" placeholder="Description" required class="mb-4"></textarea>
+      <input type="text" id="vendor-specials" placeholder="Specials (e.g., Taco Tuesday)" required class="mb-4">
+      <input type="file" id="vendor-photos" accept="image/*" multiple class="mb-4">
+    </div>
+    <button id="vendor-submit" class="btn-primary w-full py-3">Submit</button>
+    <p id="vendor-toggle" class="text-center mt-4">Already have an account? <a href="#" onclick="toggleVendorAuthMode()" class="text-cyan-400">Login</a></p>
+  </div>
+
+  <div id="customer-modal" class="modal hidden p-6 max-w-lg w-full">
+    <h2 class="text-2xl font-bold text-cyan-400 mb-4">Foodie Login/Sign Up</h2>
+    <input type="email" id="customer-email" placeholder="Email" required class="mb-4">
+    <input type="password" id="customer-password" placeholder="Password" required class="mb-4">
+    <div id="customer-signup-fields" class="hidden">
+      <input type="text" id="customer-name" placeholder="Your Name" required class="mb-4">
+    </div>
+    <button id="customer-submit" class="btn-primary w-full py-3">Submit</button>
+    <p id="customer-toggle" class="text-center mt-4">Already have an account? <a href="#" onclick="toggleCustomerAuthMode()" class="text-cyan-400">Login</a></p>
+  </div>
+
+  <div id="vendor-dashboard" class="modal hidden p-6 max-w-2xl w-full">
+    <h2 class="text-2xl font-bold text-cyan-400 mb-4">Vendor Dashboard</h2>
+    <input type="text" id="dash-name" placeholder="Business Name" class="mb-4">
+    <input type="text" id="dash-foodType" placeholder="Food Type" class="mb-4">
+    <input type="text" id="dash-contact" placeholder="Contact Info" class="mb-4">
+    <input type="text" id="dash-address" placeholder="Start typing address..." class="mb-4">
+    <div id="dash-address-preview" class="text-sm text-cyan-400 mb-4"></div>
+    <div class="flex space-x-2 mb-4">
+      <input type="text" id="dash-startTime" placeholder="Start (e.g., 9:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$" class="flex-1">
+      <select id="dash-startPeriod" class="w-1/3">
+        <option value="AM">AM</option>
+        <option value="PM">PM</option>
+      </select>
+    </div>
+    <div class="flex space-x-2 mb-4">
+      <input type="text" id="dash-endTime" placeholder="End (e.g., 5:00)" pattern="^(1[0-2]|0?[1-9]):[0-5][0-9]$" class="flex-1">
+      <select id="dash-endPeriod" class="w-1/3">
+        <option value="AM">AM</option>
+        <option value="PM">PM</option>
+      </select>
+    </div>
+    <textarea id="dash-description" placeholder="Description" class="mb-4"></textarea>
+    <input type="text" id="dash-specials" placeholder="Specials" class="mb-4">
+    <input type="file" id="dash-photos" accept="image/*" multiple class="mb-4">
+    <h3 class="text-xl text-cyan-400 mb-2">Menu</h3>
+    <div id="menu-items" class="mb-4"></div>
+    <button onclick="addMenuItem()" class="btn-secondary w-full py-2 mb-4">Add Item</button>
+    <button id="update-profile" class="btn-primary w-full py-3">Update Profile</button>
+    <button id="live-toggle" class="btn-primary w-full py-3 mt-4">Go Live</button>
+  </div>
+
+  <div id="business-page" class="modal hidden p-6 max-w-2xl w-full">
+    <h2 id="page-name" class="text-2xl font-bold text-cyan-400 mb-4"></h2>
+    <p id="page-foodType"></p>
+    <p id="page-contact"></p>
+    <p id="page-address"></p>
+    <p id="page-hours"></p>
+    <p id="page-description"></p>
+    <p id="page-specials"></p>
+    <div id="page-photos" class="grid grid-cols-2 gap-4 mb-4"></div>
+    <div id="business-actions" class="space-y-4"></div>
+    <button id="close-page" onclick="closeBusinessPage()" class="btn-secondary w-full py-3 mt-4">Close</button>
+  </div>
+
+  <div id="reviews-modal" class="modal hidden p-6 max-w-lg w-full">
+    <h2 class="text-2xl font-bold text-cyan-400 mb-4">Reviews for <span id="review-truck-name"></span></h2>
+    <div id="review-list" class="space-y-4"></div>
+    <button id="close-reviews" onclick="document.getElementById('reviews-modal').style.display = 'none'" class="btn-secondary w-full py-3 mt-4">Close</button>
+  </div>
+
+  <div id="order-modal" class="modal hidden p-6 max-w-lg w-full">
+    <h2 class="text-2xl font-bold text-cyan-400 mb-4">Order from <span id="order-truck-name"></span></h2>
+    <div id="order-menu" class="space-y-4"></div>
+    <button id="place-order" class="btn-primary w-full py-3 mt-4">Place Order</button>
+    <button onclick="document.getElementById('order-modal').style.display = 'none'" class="btn-secondary w-full py-3 mt-2">Cancel</button>
+  </div>
+
+  <div id="visit-modal" class="modal hidden p-6 max-w-lg w-full">
+    <h2 class="text-2xl font-bold text-cyan-400 mb-4">Mark Visit to <span id="visit-truck-name"></span></h2>
+    <input type="file" id="visit-receipt" accept="image/*" class="mb-4">
+    <button id="submit-visit" class="btn-primary w-full py-3">Submit Receipt</button>
+    <button onclick="document.getElementById('visit-modal').style.display = 'none'" class="btn-secondary w-full py-3 mt-2">Cancel</button>
+  </div>
+
   <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-firestore.js"></script>
   <script src="https://www.gstatic.com/firebasejs/7.24.0/firebase-storage.js"></script>
