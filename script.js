@@ -22,28 +22,6 @@ if (typeof firebase !== 'undefined') {
   }
 }
 
-// DOM Elements
-const sidebar = document.getElementById('sidebar');
-const sidebarToggle = document.getElementById('sidebar-toggle');
-const content = document.getElementById('content');
-const vendorAuthBtn = document.getElementById('vendor-auth-btn');
-const customerAuthBtn = document.getElementById('customer-auth-btn');
-const authModal = document.getElementById('auth-modal');
-const authTitle = document.getElementById('auth-title');
-const signupFields = document.getElementById('signup-fields');
-const authSubmit = document.getElementById('auth-submit');
-const authToggle = document.getElementById('auth-toggle');
-const dashboard = document.getElementById('dashboard');
-const dashboardBtn = document.getElementById('dashboard-btn');
-const logoutBtn = document.getElementById('logout');
-const updateProfileBtn = document.getElementById('update-profile');
-const liveToggle = document.getElementById('live-toggle');
-const vendorFields = document.getElementById('vendor-fields');
-const truckSearch = document.getElementById('truck-search');
-const foodTypeFilter = document.getElementById('food-type-filter');
-const statusFilter = document.getElementById('status-filter');
-
-// Global Variables
 let map, clusterGroup, allPins = [];
 const foodTruckIcon = L.icon({
   iconUrl: 'https://cdn-icons-png.flaticon.com/512/1048/1048313.png',
@@ -51,12 +29,10 @@ const foodTruckIcon = L.icon({
   iconAnchor: [19, 38],
   popupAnchor: [0, -38]
 });
-let isSignupMode = true;
-let authType = null;
-const PRICE_MARKUP = 1.15; // 15% markup
+let vendorSignupMode = true, customerSignupMode = true;
+const PRICE_MARKUP = 1.15;
 
-// Initialize Leaflet map with OpenStreetMap
-console.log("Attempting to load map...");
+// Initialize map
 navigator.geolocation.getCurrentPosition(position => {
   const { latitude, longitude } = position.coords;
   console.log("Geolocation success:", latitude, longitude);
@@ -78,342 +54,164 @@ navigator.geolocation.getCurrentPosition(position => {
   loadPins();
 });
 
-// Sidebar toggle
-if (sidebarToggle) {
-  sidebarToggle.onclick = () => {
-    sidebar.classList.toggle('hidden');
-    content.classList.toggle('full');
-    sidebarToggle.classList.toggle('hidden');
-  };
+// Auth handling
+document.getElementById('vendor-btn').onclick = () => {
+  document.getElementById('vendor-modal').classList.remove('hidden');
+  updateVendorAuthMode();
+};
+
+document.getElementById('customer-btn').onclick = () => {
+  document.getElementById('customer-modal').classList.remove('hidden');
+  updateCustomerAuthMode();
+};
+
+function updateVendorAuthMode() {
+  const modal = document.getElementById('vendor-modal');
+  modal.querySelector('h2').textContent = vendorSignupMode ? "Vendor Sign Up" : "Vendor Login";
+  document.getElementById('vendor-signup-fields').classList.toggle('hidden', !vendorSignupMode);
+  document.getElementById('vendor-submit').textContent = vendorSignupMode ? "Sign Up" : "Login";
+  document.getElementById('vendor-toggle').innerHTML = vendorSignupMode
+    ? 'Already have an account? <a href="#" onclick="toggleVendorAuthMode()" class="text-cyan-400">Login</a>'
+    : 'Need an account? <a href="#" onclick="toggleVendorAuthMode()" class="text-cyan-400">Sign Up</a>';
+  if (vendorSignupMode) initializeVendorAutocomplete();
 }
 
-// Authentication handling
-if (vendorAuthBtn) {
-  vendorAuthBtn.onclick = () => {
-    authType = 'vendor';
-    authModal.style.display = 'block';
-    dashboard.style.display = 'none';
-    updateAuthMode();
-  };
+function updateCustomerAuthMode() {
+  const modal = document.getElementById('customer-modal');
+  modal.querySelector('h2').textContent = customerSignupMode ? "Customer Sign Up" : "Customer Login";
+  document.getElementById('customer-signup-fields').classList.toggle('hidden', !customerSignupMode);
+  document.getElementById('customer-submit').textContent = customerSignupMode ? "Sign Up" : "Login";
+  document.getElementById('customer-toggle').innerHTML = customerSignupMode
+    ? 'Already have an account? <a href="#" onclick="toggleCustomerAuthMode()" class="text-cyan-400">Login</a>'
+    : 'Need an account? <a href="#" onclick="toggleCustomerAuthMode()" class="text-cyan-400">Sign Up</a>';
 }
 
-if (customerAuthBtn) {
-  customerAuthBtn.onclick = () => {
-    authType = 'customer';
-    authModal.style.display = 'block';
-    dashboard.style.display = 'none';
-    updateAuthMode();
-  };
-}
-
-function updateAuthMode() {
-  if (isSignupMode) {
-    authTitle.textContent = authType === 'vendor' ? "Vendor Sign Up" : "Customer Sign Up";
-    signupFields.style.display = 'block';
-    vendorFields.style.display = authType === 'vendor' ? 'block' : 'none';
-    authSubmit.textContent = "Sign Up";
-    authToggle.innerHTML = 'Already have an account? <a href="#" onclick="toggleAuthMode()">Login</a>';
-  } else {
-    authTitle.textContent = authType === 'vendor' ? "Vendor Login" : "Customer Login";
-    signupFields.style.display = 'none';
-    authSubmit.textContent = "Login";
-    authToggle.innerHTML = 'Need an account? <a href="#" onclick="toggleAuthMode()">Sign Up</a>';
-  }
-}
-
-function toggleAuthMode() {
-  isSignupMode = !isSignupMode;
-  updateAuthMode();
+function toggleVendorAuthMode() {
+  vendorSignupMode = !vendorSignupMode;
+  updateVendorAuthMode();
   event.preventDefault();
 }
 
-// Autocomplete setup
-let signupAutocomplete, dashAutocomplete;
-function initializeSignUpAutocomplete() {
-  const input = document.getElementById('address');
+function toggleCustomerAuthMode() {
+  customerSignupMode = !customerSignupMode;
+  updateCustomerAuthMode();
+  event.preventDefault();
+}
+
+let vendorAutocomplete;
+function initializeVendorAutocomplete() {
+  const input = document.getElementById('vendor-address');
   if (!input) return;
-  signupAutocomplete = new google.maps.places.Autocomplete(input, {
+  vendorAutocomplete = new google.maps.places.Autocomplete(input, {
     types: ['address'],
     componentRestrictions: { country: 'us' },
     fields: ['formatted_address', 'geometry.location']
   });
-  signupAutocomplete.addListener('place_changed', () => {
-    const place = signupAutocomplete.getPlace();
+  vendorAutocomplete.addListener('place_changed', () => {
+    const place = vendorAutocomplete.getPlace();
     if (place.geometry) {
-      document.getElementById('address-preview').textContent = `Selected: ${place.formatted_address}`;
-      console.log("Sign-up address selected:", place.formatted_address, "Coords:", place.geometry.location.lat(), place.geometry.location.lng());
+      document.getElementById('vendor-address-preview').textContent = `Selected: ${place.formatted_address}`;
     }
   });
 }
 
-function initializeDashAutocomplete() {
-  const input = document.getElementById('dash-address');
-  if (!input) return;
-  dashAutocomplete = new google.maps.places.Autocomplete(input, {
-    types: ['address'],
-    componentRestrictions: { country: 'us' },
-    fields: ['formatted_address', 'geometry.location']
-  });
-  dashAutocomplete.addListener('place_changed', () => {
-    const place = dashAutocomplete.getPlace();
-    if (place.geometry) {
-      document.getElementById('dash-address-preview').textContent = `Selected: ${place.formatted_address}`;
-      console.log("Dashboard address selected:", place.formatted_address, "Coords:", place.geometry.location.lat(), place.geometry.location.lng());
-    }
-  });
-}
-
-initializeSignUpAutocomplete();
-
-if (authSubmit) {
-  authSubmit.onclick = async () => {
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    try {
-      let user;
-      if (isSignupMode) {
-        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        user = userCredential.user;
-      } else {
-        const userCredential = await auth.signInWithEmailAndPassword(email, password);
-        user = userCredential.user;
-        console.log("User logged in:", user.uid);
-        authModal.style.display = 'none';
-        return;
-      }
-
-      const userData = {
+document.getElementById('vendor-submit').onclick = async () => {
+  const email = document.getElementById('vendor-email').value;
+  const password = document.getElementById('vendor-password').value;
+  try {
+    let user;
+    if (vendorSignupMode) {
+      const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+      user = userCredential.user;
+      const place = vendorAutocomplete.getPlace();
+      if (!place || !place.geometry) throw new Error("Please select an address from the dropdown");
+      const address = place.formatted_address;
+      const coords = { latitude: place.geometry.location.lat(), longitude: place.geometry.location.lng() };
+      const vendorData = {
         email,
-        name: document.getElementById('name').value,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      };
-
-      if (authType === 'vendor') {
-        const place = signupAutocomplete.getPlace();
-        if (!place || !place.geometry) throw new Error("Please select an address from the dropdown");
-        const address = place.formatted_address;
-        const coords = { latitude: place.geometry.location.lat(), longitude: place.geometry.location.lng() };
-        Object.assign(userData, {
-          foodType: document.getElementById('foodType').value,
-          contact: document.getElementById('contact').value,
-          description: document.getElementById('description').value,
-          address,
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          startTime: document.getElementById('startTime').value,
-          startPeriod: document.getElementById('startPeriod').value,
-          endTime: document.getElementById('endTime').value,
-          endPeriod: document.getElementById('endPeriod').value,
-          specials: document.getElementById('specials').value,
-          approved: false,
-          productPhotos: [],
-          menu: []
-        });
-        await db.collection('vendors').doc(user.uid).set(userData);
-        await uploadInitialPhotos(user.uid);
-        console.log("Vendor signed up:", user.uid);
-      } else {
-        userData.points = 0;
-        userData.badges = [];
-        userData.coupons = {};
-        await db.collection('customers').doc(user.uid).set(userData);
-        console.log("Customer signed up:", user.uid);
-      }
-      authModal.style.display = 'none';
-    } catch (error) {
-      console.error("Auth failed:", error);
-      alert("Error: " + error.message);
-    }
-  };
-}
-
-async function uploadInitialPhotos(userId) {
-  const photos = document.getElementById('photos').files;
-  console.log("Uploading initial photos:", photos.length, "files detected");
-  if (photos.length > 0) {
-    const photoUrls = await uploadPhotos(photos, userId);
-    await db.collection('vendors').doc(userId).update({ productPhotos: photoUrls });
-    console.log("Initial product photos uploaded:", photoUrls);
-  }
-}
-
-auth.onAuthStateChanged(async user => {
-  if (user) {
-    vendorAuthBtn.style.display = 'none';
-    customerAuthBtn.style.display = 'none';
-    logoutBtn.style.display = 'block';
-    const vendorDoc = await db.collection('vendors').doc(user.uid).get();
-    const customerDoc = await db.collection('customers').doc(user.uid).get();
-
-    if (vendorDoc.exists) {
-      const vendorData = vendorDoc.data();
-      document.getElementById('sidebar-name').textContent = vendorData.name;
-      document.getElementById('sidebar-status').textContent = vendorData.approved ? "Approved" : "Pending Approval";
-      if (vendorData.approved) {
-        dashboardBtn.style.display = 'block';
-        const pinDoc = await db.collection('pins').doc(user.uid).get();
-        const isLive = pinDoc.exists && pinDoc.data().live;
-        liveToggle.textContent = isLive ? "Go Offline" : "Go Live";
-        liveToggle.onclick = () => toggleLiveStatus(user.uid, isLive);
-        dashboardBtn.onclick = () => showDashboard(vendorData);
-      } else {
-        dashboardBtn.style.display = 'none';
-      }
-    }
-    if (customerDoc.exists) {
-      const customerData = customerDoc.data();
-      if (!vendorDoc.exists) document.getElementById('sidebar-name').textContent = customerData.name;
-      document.getElementById('sidebar-status').textContent += vendorDoc.exists ? " | Foodie" : "Foodie";
-      loadVisitedTrucks(user.uid);
-      loadTruckTrek(user.uid);
-    }
-  } else {
-    vendorAuthBtn.style.display = 'block';
-    customerAuthBtn.style.display = 'block';
-    dashboardBtn.style.display = 'none';
-    logoutBtn.style.display = 'none';
-    dashboard.style.display = 'none';
-    document.getElementById('visited-trucks').style.display = 'none';
-    document.getElementById('truck-trek').style.display = 'none';
-    document.getElementById('sidebar-name').textContent = '';
-    document.getElementById('sidebar-status').textContent = '';
-  }
-});
-
-async function toggleLiveStatus(userId, isLive) {
-  const vendorDoc = await db.collection('vendors').doc(userId).get();
-  const vendorData = vendorDoc.data();
-  if (!vendorData.approved) {
-    alert("Your account must be approved before going live.");
-    return;
-  }
-  if (isLive) {
-    await db.collection('pins').doc(userId).delete();
-    console.log("Vendor went offline:", userId);
-    liveToggle.textContent = "Go Live";
-  } else {
-    await db.collection('pins').doc(userId).set({
-      ...vendorData,
-      live: true,
-      latitude: vendorData.latitude,
-      longitude: vendorData.longitude,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    console.log("Vendor went live:", userId);
-    liveToggle.textContent = "Go Offline";
-  }
-}
-
-function showDashboard(vendorData) {
-  authModal.style.display = 'none';
-  dashboard.style.display = 'block';
-  document.getElementById('dash-name').value = vendorData.name || '';
-  document.getElementById('dash-foodType').value = vendorData.foodType || '';
-  document.getElementById('dash-contact').value = vendorData.contact || '';
-  document.getElementById('dash-address').value = vendorData.address || '';
-  document.getElementById('dash-startTime').value = vendorData.startTime || '';
-  document.getElementById('dash-startPeriod').value = vendorData.startPeriod || 'AM';
-  document.getElementById('dash-endTime').value = vendorData.endTime || '';
-  document.getElementById('dash-endPeriod').value = vendorData.endPeriod || 'PM';
-  document.getElementById('dash-description').value = vendorData.description || '';
-  document.getElementById('dash-specials').value = vendorData.specials || '';
-  const menuItemsDiv = document.getElementById('menu-items');
-  menuItemsDiv.innerHTML = '';
-  (vendorData.menu || []).forEach(item => {
-    const div = document.createElement('div');
-    div.className = 'menu-item';
-    div.innerHTML = `
-      <input type="text" placeholder="Item Name" class="menu-name" value="${item.name}">
-      <input type="number" placeholder="Price ($)" class="menu-price" step="0.01" value="${item.price}">
-    `;
-    menuItemsDiv.appendChild(div);
-  });
-  initializeDashAutocomplete();
-}
-
-function addMenuItem() {
-  const menuItemsDiv = document.getElementById('menu-items');
-  const div = document.createElement('div');
-  div.className = 'menu-item';
-  div.innerHTML = `
-    <input type="text" placeholder="Item Name" class="menu-name">
-    <input type="number" placeholder="Price ($)" class="menu-price" step="0.01">
-  `;
-  menuItemsDiv.appendChild(div);
-}
-
-if (updateProfileBtn) {
-  updateProfileBtn.onclick = async () => {
-    const userId = auth.currentUser.uid;
-    try {
-      const vendorDoc = await db.collection('vendors').doc(userId).get();
-      if (!vendorDoc.data().approved) {
-        alert("Your account must be approved to edit your profile.");
-        return;
-      }
-      const place = dashAutocomplete.getPlace();
-      let address = document.getElementById('dash-address').value;
-      let coords = { latitude: null, longitude: null };
-      if (place && place.geometry) {
-        address = place.formatted_address;
-        coords.latitude = place.geometry.location.lat();
-        coords.longitude = place.geometry.location.lng();
-      } else {
-        const existingData = vendorDoc.data();
-        coords.latitude = existingData.latitude;
-        coords.longitude = existingData.longitude;
-      }
-      const menuItems = Array.from(document.querySelectorAll('.menu-item')).map(item => ({
-        name: item.querySelector('.menu-name').value,
-        price: parseFloat(item.querySelector('.menu-price').value) || 0
-      })).filter(item => item.name && item.price > 0);
-      const updatedData = {
-        name: document.getElementById('dash-name').value,
-        foodType: document.getElementById('dash-foodType').value,
-        contact: document.getElementById('dash-contact').value,
+        name: document.getElementById('vendor-name').value,
+        foodType: document.getElementById('vendor-foodType').value,
+        contact: document.getElementById('vendor-contact').value,
         address,
         latitude: coords.latitude,
         longitude: coords.longitude,
-        startTime: document.getElementById('dash-startTime').value,
-        startPeriod: document.getElementById('dash-startPeriod').value,
-        endTime: document.getElementById('dash-endTime').value,
-        endPeriod: document.getElementById('dash-endPeriod').value,
-        specials: document.getElementById('dash-specials').value,
-        description: document.getElementById('dash-description').value,
-        menu: menuItems,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        startTime: document.getElementById('vendor-startTime').value,
+        startPeriod: document.getElementById('vendor-startPeriod').value,
+        endTime: document.getElementById('vendor-endTime').value,
+        endPeriod: document.getElementById('vendor-endPeriod').value,
+        description: document.getElementById('vendor-description').value,
+        specials: document.getElementById('vendor-specials').value,
+        approved: false,
+        productPhotos: [],
+        menu: [],
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
       };
-      await db.collection('vendors').doc(userId).update(updatedData);
-      const photos = document.getElementById('dash-photos').files;
-      if (photos.length > 0) {
-        const photoUrls = await uploadPhotos(photos, userId);
-        await db.collection('vendors').doc(userId).update({
-          productPhotos: firebase.firestore.FieldValue.arrayUnion(...photoUrls)
-        });
-        const pinDoc = await db.collection('pins').doc(userId).get();
-        if (pinDoc.exists && pinDoc.data().live) {
-          await db.collection('pins').doc(userId).update({
-            productPhotos: firebase.firestore.FieldValue.arrayUnion(...photoUrls),
-            ...updatedData
-          });
-        }
-      }
-      console.log("Profile updated for:", userId);
-      alert("Profile updated successfully!");
-    } catch (error) {
-      console.error("Profile update failed:", error);
-      alert("Error: " + error.message);
+      await db.collection('vendors').doc(user.uid).set(vendorData);
+      await uploadInitialPhotos(user.uid, 'vendor-photos');
+    } else {
+      const userCredential = await auth.signInWithEmailAndPassword(email, password);
+      user = userCredential.user;
     }
-  };
-}
+    document.getElementById('vendor-modal').classList.add('hidden');
+  } catch (error) {
+    console.error("Vendor auth failed:", error);
+    alert("Error: " + error.message);
+  }
+};
 
-if (logoutBtn) {
-  logoutBtn.onclick = async () => {
-    await auth.signOut();
-    console.log("User logged out");
-    dashboard.style.display = 'none';
-  };
-}
+document.getElementById('customer-submit').onclick = async () => {
+  const email = document.getElementById('customer-email').value;
+  const password = document.getElementById('customer-password').value;
+  try {
+    let user;
+    if (customerSignupMode) {
+      const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+      user = userCredential.user;
+      const customerData = {
+        email,
+        name: document.getElementById('customer-name').value,
+        points: 0,
+        badges: [],
+        coupons: {},
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      await db.collection('customers').doc(user.uid).set(customerData);
+    } else {
+      const userCredential = await auth.signInWithEmailAndPassword(email, password);
+      user = userCredential.user;
+    }
+    document.getElementById('customer-modal').classList.add('hidden');
+  } catch (error) {
+    console.error("Customer auth failed:", error);
+    alert("Error: " + error.message);
+  }
+};
+
+auth.onAuthStateChanged(async user => {
+  if (user) {
+    document.getElementById('vendor-btn').classList.add('hidden');
+    document.getElementById('customer-btn').classList.add('hidden');
+    document.getElementById('logout').classList.remove('hidden');
+    const vendorDoc = await db.collection('vendors').doc(user.uid).get();
+    const customerDoc = await db.collection('customers').doc(user.uid).get();
+    if (vendorDoc.exists && vendorDoc.data().approved) {
+      document.getElementById('vendor-btn').classList.remove('hidden');
+    }
+    if (customerDoc.exists) {
+      document.getElementById('customer-btn').classList.remove('hidden');
+    }
+  } else {
+    document.getElementById('vendor-btn').classList.remove('hidden');
+    document.getElementById('customer-btn').classList.remove('hidden');
+    document.getElementById('logout').classList.add('hidden');
+    document.getElementById('vendor-dashboard').classList.add('hidden');
+  }
+});
+
+document.getElementById('logout').onclick = async () => {
+  await auth.signOut();
+  console.log("User logged out");
+};
 
 async function loadPins() {
   db.collection('pins').onSnapshot(async snapshot => {
@@ -430,11 +228,12 @@ async function loadPins() {
 
   db.collection('pins').get().then(snapshot => {
     const foodTypes = [...new Set(snapshot.docs.map(doc => doc.data().foodType))];
+    const filter = document.getElementById('food-type-filter');
     foodTypes.forEach(type => {
       const option = document.createElement('option');
       option.value = type;
       option.textContent = type;
-      foodTypeFilter.appendChild(option);
+      filter.appendChild(option);
     });
   });
 }
@@ -448,9 +247,9 @@ function debounce(func, wait) {
 }
 
 function updateTruckList() {
-  const searchQuery = truckSearch.value.toLowerCase();
-  const foodType = foodTypeFilter.value;
-  const status = statusFilter.value;
+  const searchQuery = document.getElementById('truck-search').value.toLowerCase();
+  const foodType = document.getElementById('food-type-filter').value;
+  const status = document.getElementById('status-filter').value;
 
   const filteredPins = allPins.filter(pin => {
     const matchesSearch = pin.name.toLowerCase().includes(searchQuery) || pin.description.toLowerCase().includes(searchQuery);
@@ -461,14 +260,8 @@ function updateTruckList() {
 
   const truckList = document.getElementById('truck-list');
   truckList.innerHTML = '';
-  console.log("Filtered pins for truck list:", filteredPins);
-
   filteredPins.forEach(pin => {
-    if (!pin.startTime || !pin.endTime || !pin.startPeriod || !pin.endPeriod) {
-      console.log(`Skipping ${pin.name || 'unnamed pin'} due to missing time fields:`, pin);
-      return;
-    }
-
+    if (!pin.startTime || !pin.endTime || !pin.startPeriod || !pin.endPeriod) return;
     const now = new Date();
     let currentHours = now.getHours() + now.getMinutes() / 60;
     let startHours = parseInt(pin.startTime.split(':')[0]) + parseInt(pin.startTime.split(':')[1]) / 60;
@@ -478,48 +271,38 @@ function updateTruckList() {
     if (pin.endPeriod === 'PM' && endHours < 12) endHours += 12;
     if (pin.endPeriod === 'AM' && endHours === 12) endHours = 0;
 
-    console.log(`Checking ${pin.name}: Now=${currentHours}, Start=${startHours}, End=${endHours}`);
-
     if (currentHours >= startHours && currentHours <= endHours) {
       const card = document.createElement('div');
-      card.className = `truck-card ${pin.live ? 'live' : ''}`;
+      card.className = `truck-card bg-gray-800 p-4 rounded-lg ${pin.live ? 'border-2 border-cyan-400' : ''}`;
       card.innerHTML = `
-        <h3>${pin.name}</h3>
-        <p>${pin.foodType} • ${pin.live ? 'Live Now' : 'Offline'}</p>
-        <p class="rating-info">${pin.avgRating || 'No'} ★ (${pin.ratingCount || 0} reviews)</p>
+        <h3 class="text-xl font-bold text-white">${pin.name}</h3>
+        <p class="text-gray-400">${pin.foodType} • ${pin.live ? 'Live Now' : 'Offline'}</p>
+        <p class="text-pink-400">${pin.avgRating || 'No'} ★ (${pin.ratingCount || 0} reviews)</p>
       `;
       card.onclick = () => showBusinessPage(pin);
       truckList.appendChild(card);
-    } else {
-      console.log(`${pin.name} excluded from list due to hours`);
     }
   });
 
   clusterGroup.clearLayers();
   filteredPins.forEach(pin => {
     if (pin.latitude && pin.longitude) {
-      console.log(`Adding marker for ${pin.name} at ${pin.latitude}, ${pin.longitude}`);
       const marker = L.marker([pin.latitude, pin.longitude], { icon: foodTruckIcon })
         .bindPopup(`<b>${pin.name}</b><br>${pin.description}<br>${pin.avgRating || 'No'} ★ (${pin.ratingCount || 0} reviews)`)
         .on('click', () => showBusinessPage(pin));
       clusterGroup.addLayer(marker);
-    } else {
-      console.log(`No valid coords for ${pin.name}: lat=${pin.latitude}, lng=${pin.longitude}`);
     }
   });
-  if (clusterGroup.getLayers().length > 0) {
-    map.fitBounds(clusterGroup.getBounds().pad(0.1));
-  }
+  if (clusterGroup.getLayers().length > 0) map.fitBounds(clusterGroup.getBounds().pad(0.1));
 }
 
-truckSearch.oninput = debounce(updateTruckList, 300);
-foodTypeFilter.onchange = updateTruckList;
-statusFilter.onchange = updateTruckList;
+document.getElementById('truck-search').oninput = debounce(updateTruckList, 300);
+document.getElementById('food-type-filter').onchange = updateTruckList;
+document.getElementById('status-filter').onchange = updateTruckList;
 
-// Business page with ratings, orders, and reviews
 async function showBusinessPage(pin) {
   const businessPage = document.getElementById('business-page');
-  const businessActions = document.getElementById('business-actions');
+  const actions = document.getElementById('business-actions');
   document.getElementById('page-name').textContent = pin.name;
   document.getElementById('page-foodType').textContent = `Food Type: ${pin.foodType}`;
   document.getElementById('page-contact').textContent = `Contact: ${pin.contact}`;
@@ -533,28 +316,29 @@ async function showBusinessPage(pin) {
     pin.productPhotos.forEach(url => {
       const img = document.createElement('img');
       img.src = url;
+      img.className = 'rounded-lg';
       img.loading = 'lazy';
       photosDiv.appendChild(img);
     });
   }
-  
-  businessActions.innerHTML = `
-    <div class="rating">
-      <label>Rate:</label>
-      <select id="rating">
+
+  actions.innerHTML = `
+    <div class="rating space-y-2">
+      <label class="text-cyan-400">Rate:</label>
+      <select id="rating" class="w-full p-2 bg-gray-800 border border-gray-700 rounded-lg">
         <option value="1">1</option>
         <option value="2">2</option>
         <option value="3">3</option>
         <option value="4">4</option>
         <option value="5">5</option>
       </select>
-      <textarea id="comment" placeholder="Leave a comment about your visit"></textarea>
-      <button id="submit-rating">Submit</button>
+      <textarea id="comment" placeholder="Leave a comment about your visit" class="w-full p-2 bg-gray-800 border border-gray-700 rounded-lg"></textarea>
+      <button id="submit-rating" class="btn-primary w-full py-2">Submit</button>
     </div>
-    <button onclick="markVisited('${pin.id}')">Mark as Visited</button>
-    <button onclick="showOrderModal('${pin.id}', '${pin.name}')">Order Now</button>
+    <button onclick="showVisitModal('${pin.id}', '${pin.name}')" class="btn-primary w-full py-2">Mark as Visited</button>
+    <button onclick="showOrderModal('${pin.id}', '${pin.name}')" class="btn-primary w-full py-2">Order Now</button>
   `;
-  
+
   const submitBtn = document.getElementById('submit-rating');
   if (!auth.currentUser) {
     submitBtn.disabled = true;
@@ -576,29 +360,20 @@ async function showBusinessPage(pin) {
       }
     }
   }
-  businessPage.style.display = 'block';
+  businessPage.classList.remove('hidden');
 }
 
 function closeBusinessPage() {
-  document.getElementById('business-page').style.display = 'none';
+  document.getElementById('business-page').classList.add('hidden');
 }
 
 async function submitRating(pinId) {
-  if (!auth.currentUser) {
-    alert("Please log in as a customer to submit a rating.");
-    return;
-  }
+  if (!auth.currentUser) return alert("Please log in as a customer to submit a rating.");
   const userId = auth.currentUser.uid;
   const customerDoc = await db.collection('customers').doc(userId).get();
-  if (!customerDoc.exists) {
-    alert("Only customers can submit ratings.");
-    return;
-  }
+  if (!customerDoc.exists) return alert("Only customers can submit ratings.");
   const existingReview = await db.collection('ratings').where('pinId', '==', pinId).where('userId', '==', userId).get();
-  if (!existingReview.empty) {
-    alert("You have already rated this truck.");
-    return;
-  }
+  if (!existingReview.empty) return alert("You have already rated this truck.");
   const rating = document.getElementById('rating').value;
   const comment = document.getElementById('comment').value;
   try {
@@ -610,7 +385,6 @@ async function submitRating(pinId) {
       reviewerName: customerDoc.data().name,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-    console.log("Rating submitted for pin:", pinId);
     alert("Rating submitted successfully!");
     document.getElementById('submit-rating').disabled = false;
     document.getElementById('submit-rating').textContent = "See What Others Are Saying";
@@ -629,71 +403,76 @@ async function showReviews(pin) {
 
   const reviews = await db.collection('ratings').where('pinId', '==', pin.id).orderBy('createdAt', 'desc').get();
   if (reviews.empty) {
-    reviewList.innerHTML = '<p>No reviews yet.</p>';
+    reviewList.innerHTML = '<p class="text-gray-400">No reviews yet.</p>';
   } else {
     reviews.forEach(doc => {
       const data = doc.data();
       const reviewDiv = document.createElement('div');
       reviewDiv.className = 'review';
       reviewDiv.innerHTML = `
-        <p><span class="rating-score">${data.rating} ★</span> by ${data.reviewerName}</p>
-        <p>${data.comment}</p>
+        <p class="text-pink-400 font-bold">${data.rating} ★ by ${data.reviewerName}</p>
+        <p class="text-gray-300">${data.comment}</p>
       `;
       reviewList.appendChild(reviewDiv);
     });
   }
-  reviewsModal.style.display = 'block';
+  reviewsModal.classList.remove('hidden');
+}
+
+async function showVisitModal(pinId, truckName) {
+  document.getElementById('visit-truck-name').textContent = truckName;
+  document.getElementById('submit-visit').onclick = () => markVisited(pinId);
+  document.getElementById('visit-modal').classList.remove('hidden');
 }
 
 async function markVisited(pinId) {
-  if (!auth.currentUser) {
-    alert("Please log in as a customer to mark a visit.");
-    return;
-  }
+  if (!auth.currentUser) return alert("Please log in as a customer to mark a visit.");
   const userId = auth.currentUser.uid;
   const customerDoc = await db.collection('customers').doc(userId).get();
-  if (!customerDoc.exists) {
-    alert("Only customers can mark visits. Create a customer account.");
-    return;
-  }
+  if (!customerDoc.exists) return alert("Only customers can mark visits.");
   const visitRef = db.collection('customers').doc(userId).collection('visits').doc(pinId);
   const visitDoc = await visitRef.get();
-  const now = new Date().getTime();
-  const oneDay = 24 * 60 * 60 * 1000;
 
-  if (visitDoc.exists && (now - visitDoc.data().timestamp.toMillis()) < oneDay) {
-    alert("You can only mark a visit once per day per truck.");
+  if (visitDoc.exists) {
+    alert("You’ve already earned points for visiting this truck.");
     return;
+  }
+
+  const receiptFile = document.getElementById('visit-receipt').files[0];
+  if (!receiptFile) {
+    const lastOrder = await db.collection('orders').where('userId', '==', userId).where('pinId', '==', pinId).orderBy('createdAt', 'desc').limit(1).get();
+    if (lastOrder.empty) return alert("Please upload a receipt or order via the app to verify your visit.");
+  }
+
+  let receiptUrl = null;
+  if (receiptFile) {
+    const ref = storage.ref().child(`receipts/${userId}/${pinId}/${Date.now()}_${receiptFile.name}`);
+    await ref.put(receiptFile);
+    receiptUrl = await ref.getDownloadURL();
   }
 
   await visitRef.set({
     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-    pinId
+    pinId,
+    receiptUrl
   });
 
   const visitedTrucks = customerDoc.data().visitedTrucks || {};
   visitedTrucks[pinId] = (visitedTrucks[pinId] || 0) + 1;
   const points = customerDoc.data().points || 0;
-  const newPoints = visitDoc.exists ? points : points + 10; // Only award points on first visit
+  const newPoints = points + 20; // 20 points for first visit
   let badges = customerDoc.data().badges || [];
-  const totalVisits = Object.values(visitedTrucks).reduce((sum, count) => sum + count, 0);
+  const totalVisits = Object.keys(visitedTrucks).length;
   if (totalVisits >= 30 && !badges.includes("Foodie Legend")) badges.push("Foodie Legend");
   else if (totalVisits >= 15 && !badges.includes("Street Food Star")) badges.push("Street Food Star");
   else if (totalVisits >= 5 && !badges.includes("Truck Tracker")) badges.push("Truck Tracker");
 
   let coupons = customerDoc.data().coupons || {};
-  if (totalVisits >= 15 && !coupons[pinId]) {
-    coupons[pinId] = { redeemed: false, offer: "10% off next visit" };
-  }
+  if (totalVisits >= 15 && !coupons[pinId]) coupons[pinId] = { redeemed: false, offer: "10% off next visit" };
 
-  await db.collection('customers').doc(userId).update({
-    visitedTrucks,
-    points: newPoints,
-    badges,
-    coupons
-  });
-  console.log("Truck marked as visited:", pinId);
-  loadVisitedTrucks(userId);
+  await db.collection('customers').doc(userId).update({ visitedTrucks, points: newPoints, badges, coupons });
+  alert("Visit marked successfully! +20 points");
+  document.getElementById('visit-modal').classList.add('hidden');
   loadTruckTrek(userId);
 }
 
@@ -706,15 +485,15 @@ async function showOrderModal(pinId, truckName) {
   const pinDoc = await db.collection('pins').doc(pinId).get();
   const menu = pinDoc.data().menu || [];
   if (menu.length === 0) {
-    orderMenu.innerHTML = '<p>No menu items available.</p>';
+    orderMenu.innerHTML = '<p class="text-gray-400">No menu items available.</p>';
   } else {
     menu.forEach((item, index) => {
       const adjustedPrice = (item.price * PRICE_MARKUP).toFixed(2);
       const div = document.createElement('div');
       div.className = 'menu-item';
       div.innerHTML = `
-        <p>${item.name} - $${adjustedPrice}</p>
-        <select id="quantity-${index}">
+        <p class="text-white">${item.name} - $${adjustedPrice}</p>
+        <select id="quantity-${index}" class="w-full p-2 bg-gray-800 border border-gray-700 rounded-lg">
           <option value="0">0</option>
           <option value="1">1</option>
           <option value="2">2</option>
@@ -726,30 +505,21 @@ async function showOrderModal(pinId, truckName) {
   }
 
   document.getElementById('place-order').onclick = () => placeOrder(pinId, truckName, menu);
-  orderModal.style.display = 'block';
+  orderModal.classList.remove('hidden');
 }
 
 async function placeOrder(pinId, truckName, menu) {
-  if (!auth.currentUser) {
-    alert("Please log in as a customer to place an order.");
-    return;
-  }
+  if (!auth.currentUser) return alert("Please log in as a customer to place an order.");
   const userId = auth.currentUser.uid;
   const customerDoc = await db.collection('customers').doc(userId).get();
-  if (!customerDoc.exists) {
-    alert("Only customers can place orders. Create a customer account.");
-    return;
-  }
+  if (!customerDoc.exists) return alert("Only customers can place orders.");
 
   const orderItems = menu.map((item, index) => {
     const quantity = parseInt(document.getElementById(`quantity-${index}`).value);
     return quantity > 0 ? { name: item.name, price: item.price * PRICE_MARKUP, quantity } : null;
   }).filter(item => item);
 
-  if (orderItems.length === 0) {
-    alert("Please select at least one item to order.");
-    return;
-  }
+  if (orderItems.length === 0) return alert("Please select at least one item to order.");
 
   const total = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2);
   const order = {
@@ -765,36 +535,23 @@ async function placeOrder(pinId, truckName, menu) {
 
   const orderRef = await db.collection('orders').add(order);
   await db.collection('customers').doc(userId).update({
-    points: firebase.firestore.FieldValue.increment(5),
+    points: firebase.firestore.FieldValue.increment(10),
     lastOrderId: orderRef.id
   });
-  console.log("Order placed:", orderRef.id);
-  alert(`Order placed successfully! Total: $${total}`);
-  document.getElementById('order-modal').style.display = 'none';
+  alert(`Order placed successfully! Total: $${total} (+10 points)`);
+  document.getElementById('order-modal').classList.add('hidden');
   loadTruckTrek(userId);
 }
 
-async function loadVisitedTrucks(userId) {
-  const customerDoc = await db.collection('customers').doc(userId).get();
-  if (!customerDoc.exists) return;
-  const visitedTrucks = customerDoc.data().visitedTrucks || {};
-  const visitedList = document.getElementById('visited-list');
-  visitedList.innerHTML = '';
-  const truckEntries = Object.entries(visitedTrucks).sort((a, b) => b[1] - a[1]);
-  if (truckEntries.length > 0) {
-    document.getElementById('visited-trucks').style.display = 'block';
-    for (const [pinId, count] of truckEntries) {
-      const pinDoc = await db.collection('pins').doc(pinId).get();
-      if (pinDoc.exists) {
-        const li = document.createElement('li');
-        const tier = count >= 5 ? "Foodie Legend" : count >= 3 ? "Explorer" : "Newbie";
-        li.innerHTML = `${pinDoc.data().name} (${count} visits) <span class="tier">${tier}</span>`;
-        visitedList.appendChild(li);
-      }
-    }
-  } else {
-    document.getElementById('visited-trucks').style.display = 'none';
-  }
+function addMenuItem() {
+  const menuItems = document.getElementById('menu-items');
+  const div = document.createElement('div');
+  div.className = 'menu-item flex space-x-2 mb-4';
+  div.innerHTML = `
+    <input type="text" placeholder="Item Name" class="menu-name flex-1 p-2 bg-gray-800 border border-gray-700 rounded-lg">
+    <input type="number" placeholder="Price ($)" class="menu-price w-1/3 p-2 bg-gray-800 border border-gray-700 rounded-lg" step="0.01">
+  `;
+  menuItems.appendChild(div);
 }
 
 async function loadTruckTrek(userId) {
@@ -802,31 +559,56 @@ async function loadTruckTrek(userId) {
   if (!customerDoc.exists) return;
   const points = customerDoc.data().points || 0;
   const badges = customerDoc.data().badges || [];
-  const truckTrek = document.getElementById('truck-trek');
-  truckTrek.style.display = 'block';
-  document.getElementById('trek-points').textContent = points;
-  document.getElementById('trek-badge').textContent = badges.length > 0 ? badges[badges.length - 1] : "Newbie";
+  const truckTrek = document.getElementById('truck-trek') || document.createElement('div');
+  truckTrek.id = 'truck-trek';
+  truckTrek.className = 'text-center mt-4';
+  truckTrek.innerHTML = `
+    <p><span class="points text-cyan-400 font-bold">${points}</span> Points</p>
+    <p>Badge: <span class="badge text-pink-400 italic">${badges.length > 0 ? badges[badges.length - 1] : "Newbie"}</span></p>
+  `;
+  document.getElementById('main-content').appendChild(truckTrek);
 }
 
-async function uploadPhotos(files, pinId) {
+async function uploadPhotos(files, inputId) {
   const photoUrls = [];
   for (const file of files) {
-    const ref = storage.ref().child(`pins/${pinId}/${Date.now()}_${file.name}`);
-    console.log("Attempting to upload file:", file.name);
-    try {
-      const snapshot = await ref.put(file);
-      const url = await snapshot.ref.getDownloadURL();
-      photoUrls.push(url);
-      console.log("Successfully uploaded photo:", url);
-    } catch (error) {
-      console.error("Failed to upload photo:", file.name, error);
-      throw error;
-    }
+    const ref = storage.ref().child(`photos/${auth.currentUser.uid}/${Date.now()}_${file.name}`);
+    await ref.put(file);
+    const url = await ref.getDownloadURL();
+    photoUrls.push(url);
   }
   return photoUrls;
 }
 
-// Error handling
-window.onerror = (msg, url, lineNo, columnNo, error) => {
-  console.error(`Unhandled error: ${msg} at ${url}:${lineNo}:${columnNo}`, error);
-};
+// Vendor dashboard
+document.getElementById('vendor-btn').addEventListener('click', async () => {
+  const vendorDoc = await db.collection('vendors').doc(auth.currentUser.uid).get();
+  if (vendorDoc.exists && vendorDoc.data().approved) {
+    const dashboard = document.getElementById('vendor-dashboard');
+    const data = vendorDoc.data();
+    document.getElementById('dash-name').value = data.name || '';
+    document.getElementById('dash-foodType').value = data.foodType || '';
+    document.getElementById('dash-contact').value = data.contact || '';
+    document.getElementById('dash-address').value = data.address || '';
+    document.getElementById('dash-startTime').value = data.startTime || '';
+    document.getElementById('dash-startPeriod').value = data.startPeriod || 'AM';
+    document.getElementById('dash-endTime').value = data.endTime || '';
+    document.getElementById('dash-endPeriod').value = data.endPeriod || 'PM';
+    document.getElementById('dash-description').value = data.description || '';
+    document.getElementById('dash-specials').value = data.specials || '';
+    const menuItems = document.getElementById('menu-items');
+    menuItems.innerHTML = '';
+    (data.menu || []).forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'menu-item flex space-x-2 mb-4';
+      div.innerHTML = `
+        <input type="text" value="${item.name}" class="menu-name flex-1 p-2 bg-gray-800 border border-gray-700 rounded-lg">
+        <input type="number" value="${item.price}" class="menu-price w-1/3 p-2 bg-gray-800 border border-gray-700 rounded-lg" step="0.01">
+      `;
+      menuItems.appendChild(div);
+    });
+    const pinDoc = await db.collection('pins').doc(auth.currentUser.uid).get();
+    document.getElementById('live-toggle').textContent = pinDoc.exists && pinDoc.data().live ? "Go Offline" : "Go Live";
+    dashboard.classList.remove('hidden');
+  }
+});
