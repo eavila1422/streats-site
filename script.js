@@ -22,7 +22,7 @@ if (typeof firebase !== 'undefined') {
   }
 }
 
-let map, clusterGroup, allPins = [];
+let map, clusterGroup, allPins = [], userCoords = { lat: 51.505, lng: -0.09 };
 const foodTruckIcon = L.icon({
   iconUrl: 'https://cdn-icons-png.flaticon.com/512/1048/1048313.png',
   iconSize: [38, 38],
@@ -34,9 +34,9 @@ const PRICE_MARKUP = 1.15;
 
 // Initialize map
 navigator.geolocation.getCurrentPosition(position => {
-  const { latitude, longitude } = position.coords;
-  console.log("Geolocation success:", latitude, longitude);
-  map = L.map('map').setView([latitude, longitude], 13);
+  userCoords = { lat: position.coords.latitude, lng: position.coords.longitude };
+  console.log("Geolocation success:", userCoords.lat, userCoords.lng);
+  map = L.map('map').setView([userCoords.lat, userCoords.lng], 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
   }).addTo(map);
@@ -45,7 +45,7 @@ navigator.geolocation.getCurrentPosition(position => {
   loadPins();
 }, () => {
   console.log("Geolocation failed, using fallback location");
-  map = L.map('map').setView([51.505, -0.09], 13);
+  map = L.map('map').setView([userCoords.lat, userCoords.lng], 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
   }).addTo(map);
@@ -55,22 +55,28 @@ navigator.geolocation.getCurrentPosition(position => {
 });
 
 // Auth handling
-document.getElementById('vendor-btn').onclick = () => {
-  const modal = document.getElementById('vendor-modal');
+document.getElementById('vendor-btn').onclick = async () => {
+  showLoadingOverlay();
   if (auth.currentUser) {
-    db.collection('vendors').doc(auth.currentUser.uid).get().then(doc => {
-      if (doc.exists && doc.data().approved) showVendorDashboard(doc.data());
-      else modal.classList.remove('hidden');
-    });
+    const vendorDoc = await db.collection('vendors').doc(auth.currentUser.uid).get();
+    if (vendorDoc.exists && vendorDoc.data().approved) {
+      showVendorDashboard(vendorDoc.data());
+    } else {
+      document.getElementById('vendor-modal').classList.remove('hidden');
+      updateVendorAuthMode();
+    }
   } else {
-    modal.classList.remove('hidden');
+    document.getElementById('vendor-modal').classList.remove('hidden');
+    updateVendorAuthMode();
   }
-  updateVendorAuthMode();
+  hideLoadingOverlay();
 };
 
 document.getElementById('customer-btn').onclick = () => {
+  showLoadingOverlay();
   document.getElementById('customer-modal').classList.remove('hidden');
   updateCustomerAuthMode();
+  hideLoadingOverlay();
 };
 
 function updateVendorAuthMode() {
@@ -104,7 +110,7 @@ function toggleCustomerAuthMode() {
   event.preventDefault();
 }
 
-let vendorAutocomplete, dashAutocomplete;
+let vendorAutocomplete, dashAutocomplete, locationAutocomplete;
 function initializeVendorAutocomplete() {
   const input = document.getElementById('vendor-address');
   if (!input) return;
@@ -137,7 +143,26 @@ function initializeDashAutocomplete() {
   });
 }
 
+function initializeLocationAutocomplete() {
+  const input = document.getElementById('location-filter');
+  if (!input) return;
+  locationAutocomplete = new google.maps.places.Autocomplete(input, {
+    types: ['geocode'],
+    componentRestrictions: { country: 'us' },
+    fields: ['formatted_address', 'geometry.location']
+  });
+  locationAutocomplete.addListener('place_changed', () => {
+    const place = locationAutocomplete.getPlace();
+    if (place.geometry) {
+      userCoords = { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() };
+      map.setView([userCoords.lat, userCoords.lng], 13);
+      updateTruckList();
+    }
+  });
+}
+
 document.getElementById('vendor-submit').onclick = async () => {
+  showLoadingOverlay();
   const email = document.getElementById('vendor-email').value;
   const password = document.getElementById('vendor-password').value;
   try {
@@ -152,6 +177,8 @@ document.getElementById('vendor-submit').onclick = async () => {
       const vendorData = {
         email,
         name: document.getElementById('vendor-name').value,
+        bio: document.getElementById('vendor-bio').value,
+        phone: document.getElementById('vendor-phone').value,
         foodType: document.getElementById('vendor-foodType').value,
         contact: document.getElementById('vendor-contact').value,
         address,
@@ -179,9 +206,11 @@ document.getElementById('vendor-submit').onclick = async () => {
     console.error("Vendor auth failed:", error);
     alert("Error: " + error.message);
   }
+  hideLoadingOverlay();
 };
 
 document.getElementById('customer-submit').onclick = async () => {
+  showLoadingOverlay();
   const email = document.getElementById('customer-email').value;
   const password = document.getElementById('customer-password').value;
   try {
@@ -207,37 +236,53 @@ document.getElementById('customer-submit').onclick = async () => {
     console.error("Customer auth failed:", error);
     alert("Error: " + error.message);
   }
+  hideLoadingOverlay();
 };
 
 auth.onAuthStateChanged(async user => {
+  showLoadingOverlay();
   const logoutBtn = document.getElementById('logout');
+  const vendorBtn = document.getElementById('vendor-btn');
+  const customerBtn = document.getElementById('customer-btn');
   if (user) {
     logoutBtn.classList.remove('hidden');
     const vendorDoc = await db.collection('vendors').doc(user.uid).get();
     const customerDoc = await db.collection('customers').doc(user.uid).get();
     if (vendorDoc.exists) {
-      document.getElementById('vendor-btn').textContent = vendorDoc.data().approved ? "Dashboard" : "Vendor Portal";
-      if (vendorDoc.data().approved) showVendorDashboard(vendorDoc.data());
+      vendorBtn.textContent = vendorDoc.data().approved ? "Dashboard" : "Vendor Portal (Pending Approval)";
+      if (vendorDoc.data().approved) {
+        showVendorDashboard(vendorDoc.data());
+      }
     } else {
-      document.getElementById('vendor-btn').textContent = "Become a Vendor";
+      vendorBtn.textContent = "Become a Vendor";
     }
-    if (customerDoc.exists) {
-      document.getElementById('customer-btn').textContent = "Foodie Hub";
-    } else {
-      document.getElementById('customer-btn').textContent = "Join as Foodie";
-    }
+    customerBtn.textContent = customerDoc.exists ? "Foodie Hub" : "Join as Foodie";
   } else {
     logoutBtn.classList.add('hidden');
-    document.getElementById('vendor-btn').textContent = "Vendor Portal";
-    document.getElementById('customer-btn').textContent = "Foodie Hub";
+    vendorBtn.textContent = "Vendor Portal";
+    customerBtn.textContent = "Foodie Hub";
     document.getElementById('vendor-dashboard').classList.add('hidden');
   }
+  hideLoadingOverlay();
+  initializeLocationAutocomplete(); // Ensure filters are ready
 });
 
 document.getElementById('logout').onclick = async () => {
+  showLoadingOverlay();
   await auth.signOut();
   console.log("User logged out");
+  hideLoadingOverlay();
 };
+
+function showLoadingOverlay() {
+  document.getElementById('loading-overlay').classList.remove('hidden');
+  document.getElementById('loading-overlay').classList.add('active');
+}
+
+function hideLoadingOverlay() {
+  document.getElementById('loading-overlay').classList.remove('active');
+  setTimeout(() => document.getElementById('loading-overlay').classList.add('hidden'), 300);
+}
 
 async function loadPins() {
   db.collection('pins').onSnapshot(async snapshot => {
@@ -281,7 +326,8 @@ function updateTruckList() {
     const matchesSearch = pin.name.toLowerCase().includes(searchQuery) || pin.description.toLowerCase().includes(searchQuery);
     const matchesFoodType = !foodType || pin.foodType === foodType;
     const matchesStatus = !status || (status === 'live' ? pin.live : !pin.live);
-    return matchesSearch && matchesFoodType && matchesStatus;
+    const distance = getDistance(userCoords.lat, userCoords.lng, pin.latitude, pin.longitude);
+    return matchesSearch && matchesFoodType && matchesStatus && distance < 50; // 50km radius
   });
 
   const truckList = document.getElementById('truck-list');
@@ -301,7 +347,7 @@ function updateTruckList() {
       const card = document.createElement('div');
       card.className = `truck-card bg-white shadow-md ${pin.live ? 'border-t-4 border-pink-500' : ''}`;
       card.innerHTML = `
-        <img src="${pin.productPhotos?.[0] || 'https://via.placeholder.com/300x150'}" alt="${pin.name}" class="w-full h-40 object-cover">
+        <img src="${pin.productPhotos?.[0] || 'https://placehold.co/300x150'}" alt="${pin.name}" class="w-full h-40 object-cover">
         <div class="p-4">
           <h3 class="text-xl font-semibold text-gray-900">${pin.name}</h3>
           <p class="text-gray-600">${pin.foodType} • ${pin.live ? 'Live Now' : 'Offline'}</p>
@@ -337,7 +383,9 @@ async function showBusinessPage(pin) {
   document.getElementById('page-hours').textContent = `Hours: ${pin.startTime} ${pin.startPeriod} - ${pin.endTime} ${pin.endPeriod}`;
   document.getElementById('page-description').textContent = pin.description;
   document.getElementById('page-specials').textContent = `Specials: ${pin.specials}`;
-  document.getElementById('page-vendor').textContent = `Vendor: ${pin.name}`;
+  document.getElementById('page-vendor-name').textContent = `Vendor: ${pin.name}`;
+  document.getElementById('page-vendor-bio').textContent = pin.bio || "No bio provided.";
+  document.getElementById('page-vendor-phone').textContent = `Phone: ${pin.phone || 'N/A'}`;
   const photosDiv = document.getElementById('page-photos');
   photosDiv.innerHTML = '';
   if (pin.productPhotos && pin.productPhotos.length > 0) {
@@ -353,12 +401,21 @@ async function showBusinessPage(pin) {
   const menuDiv = document.getElementById('page-menu');
   menuDiv.innerHTML = '';
   if (pin.menu && pin.menu.length > 0) {
-    pin.menu.forEach(item => {
+    pin.menu.forEach((item, index) => {
+      const adjustedPrice = (item.price * PRICE_MARKUP).toFixed(2);
       const div = document.createElement('div');
       div.className = 'flex justify-between items-center';
       div.innerHTML = `
         <p class="text-gray-900">${item.name}</p>
-        <p class="text-gray-600">$${(item.price * PRICE_MARKUP).toFixed(2)}</p>
+        <div class="flex items-center space-x-2">
+          <p class="text-gray-600">$${adjustedPrice}</p>
+          <select id="cart-quantity-${index}" class="w-20">
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+          </select>
+        </div>
       `;
       menuDiv.appendChild(div);
     });
@@ -380,7 +437,7 @@ async function showBusinessPage(pin) {
       <button id="submit-rating" class="btn-primary w-full">Submit Review</button>
     </div>
     <button onclick="showVisitModal('${pin.id}', '${pin.name}')" class="btn-primary w-full">Mark as Visited</button>
-    <button onclick="showOrderModal('${pin.id}', '${pin.name}')" class="btn-primary w-full">Order Now</button>
+    <button onclick="showOrderModal('${pin.id}', '${pin.name}', '${JSON.stringify(pin.menu)}')" class="btn-primary w-full">Order Now</button>
   ` : `
     <p class="text-gray-600">Log in to leave a review, mark as visited, or order.</p>
     <button onclick="document.getElementById('customer-modal').classList.remove('hidden'); updateCustomerAuthMode()" class="btn-primary w-full">Log In</button>
@@ -518,24 +575,21 @@ async function markVisited(pinId) {
   document.getElementById('visit-modal').classList.add('hidden');
 }
 
-async function showOrderModal(pinId, truckName) {
+async function showOrderModal(pinId, truckName, menuJson) {
   const orderModal = document.getElementById('order-modal');
   const orderMenu = document.getElementById('order-menu');
   document.getElementById('order-truck-name').textContent = truckName;
   orderMenu.innerHTML = '';
 
-  const pinDoc = await db.collection('pins').doc(pinId).get();
-  const menu = pinDoc.data().menu || [];
-  if (menu.length === 0) {
-    orderMenu.innerHTML = '<p class="text-gray-600">No menu items available.</p>';
-  } else {
+  const menu = JSON.parse(menuJson);
+  if (menu && menu.length > 0) {
     menu.forEach((item, index) => {
       const adjustedPrice = (item.price * PRICE_MARKUP).toFixed(2);
       const div = document.createElement('div');
       div.className = 'flex justify-between items-center';
       div.innerHTML = `
         <p class="text-gray-900">${item.name} - $${adjustedPrice}</p>
-        <select id="quantity-${index}" class="w-20">
+        <select id="order-quantity-${index}" class="w-20">
           <option value="0">0</option>
           <option value="1">1</option>
           <option value="2">2</option>
@@ -544,6 +598,8 @@ async function showOrderModal(pinId, truckName) {
       `;
       orderMenu.appendChild(div);
     });
+  } else {
+    orderMenu.innerHTML = '<p class="text-gray-600">No menu items available.</p>';
   }
 
   document.getElementById('place-order').onclick = () => placeOrder(pinId, truckName, menu);
@@ -557,7 +613,7 @@ async function placeOrder(pinId, truckName, menu) {
   if (!customerDoc.exists) return alert("Only customers can place orders.");
 
   const orderItems = menu.map((item, index) => {
-    const quantity = parseInt(document.getElementById(`quantity-${index}`).value);
+    const quantity = parseInt(document.getElementById(`order-quantity-${index}`).value) || parseInt(document.getElementById(`cart-quantity-${index}`).value);
     return quantity > 0 ? { name: item.name, price: item.price * PRICE_MARKUP, quantity } : null;
   }).filter(item => item);
 
@@ -598,6 +654,8 @@ function addMenuItem() {
 function showVendorDashboard(vendorData) {
   const dashboard = document.getElementById('vendor-dashboard');
   document.getElementById('dash-name').value = vendorData.name || '';
+  document.getElementById('dash-bio').value = vendorData.bio || '';
+  document.getElementById('dash-phone').value = vendorData.phone || '';
   document.getElementById('dash-foodType').value = vendorData.foodType || '';
   document.getElementById('dash-contact').value = vendorData.contact || '';
   document.getElementById('dash-address').value = vendorData.address || '';
@@ -618,7 +676,7 @@ function showVendorDashboard(vendorData) {
     `;
     menuItems.appendChild(div);
   });
-  const pinDoc = db.collection('pins').doc(auth.currentUser.uid).get().then(doc => {
+  db.collection('pins').doc(auth.currentUser.uid).get().then(doc => {
     document.getElementById('live-toggle').textContent = doc.exists && doc.data().live ? "Go Offline" : "Go Live";
   });
   document.getElementById('live-toggle').onclick = () => toggleLiveStatus(auth.currentUser.uid, vendorData.live);
@@ -668,6 +726,8 @@ async function updateVendorProfile(userId) {
     })).filter(item => item.name && item.price > 0);
     const updatedData = {
       name: document.getElementById('dash-name').value,
+      bio: document.getElementById('dash-bio').value,
+      phone: document.getElementById('dash-phone').value,
       foodType: document.getElementById('dash-foodType').value,
       contact: document.getElementById('dash-contact').value,
       address,
@@ -714,4 +774,15 @@ async function uploadInitialPhotos(userId, inputId) {
     photoUrls.push(url);
   }
   return photoUrls;
+}
+
+function getDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Radius of the earth in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c; // Distance in km
 }
