@@ -56,7 +56,15 @@ navigator.geolocation.getCurrentPosition(position => {
 
 // Auth handling
 document.getElementById('vendor-btn').onclick = () => {
-  document.getElementById('vendor-modal').classList.remove('hidden');
+  const modal = document.getElementById('vendor-modal');
+  if (auth.currentUser) {
+    db.collection('vendors').doc(auth.currentUser.uid).get().then(doc => {
+      if (doc.exists && doc.data().approved) showVendorDashboard(doc.data());
+      else modal.classList.remove('hidden');
+    });
+  } else {
+    modal.classList.remove('hidden');
+  }
   updateVendorAuthMode();
 };
 
@@ -70,8 +78,8 @@ function updateVendorAuthMode() {
   document.getElementById('vendor-signup-fields').classList.toggle('hidden', !vendorSignupMode);
   document.getElementById('vendor-submit').textContent = vendorSignupMode ? "Sign Up" : "Login";
   document.getElementById('vendor-toggle').innerHTML = vendorSignupMode
-    ? 'Already have an account? <a href="#" onclick="toggleVendorAuthMode()" class="text-red-600">Login</a>'
-    : 'Need an account? <a href="#" onclick="toggleVendorAuthMode()" class="text-red-600">Sign Up</a>';
+    ? 'Already have an account? <a href="#" onclick="toggleVendorAuthMode()" class="text-pink-600">Login</a>'
+    : 'Need an account? <a href="#" onclick="toggleVendorAuthMode()" class="text-pink-600">Sign Up</a>';
   if (vendorSignupMode) initializeVendorAutocomplete();
 }
 
@@ -80,8 +88,8 @@ function updateCustomerAuthMode() {
   document.getElementById('customer-signup-fields').classList.toggle('hidden', !customerSignupMode);
   document.getElementById('customer-submit').textContent = customerSignupMode ? "Sign Up" : "Login";
   document.getElementById('customer-toggle').innerHTML = customerSignupMode
-    ? 'Already have an account? <a href="#" onclick="toggleCustomerAuthMode()" class="text-red-600">Login</a>'
-    : 'Need an account? <a href="#" onclick="toggleCustomerAuthMode()" class="text-red-600">Sign Up</a>';
+    ? 'Already have an account? <a href="#" onclick="toggleCustomerAuthMode()" class="text-pink-600">Login</a>'
+    : 'Need an account? <a href="#" onclick="toggleCustomerAuthMode()" class="text-pink-600">Sign Up</a>';
 }
 
 function toggleVendorAuthMode() {
@@ -165,8 +173,6 @@ document.getElementById('vendor-submit').onclick = async () => {
     } else {
       const userCredential = await auth.signInWithEmailAndPassword(email, password);
       user = userCredential.user;
-      const vendorDoc = await db.collection('vendors').doc(user.uid).get();
-      if (vendorDoc.exists && vendorDoc.data().approved) showVendorDashboard(vendorDoc.data());
     }
     document.getElementById('vendor-modal').classList.add('hidden');
   } catch (error) {
@@ -209,8 +215,17 @@ auth.onAuthStateChanged(async user => {
     logoutBtn.classList.remove('hidden');
     const vendorDoc = await db.collection('vendors').doc(user.uid).get();
     const customerDoc = await db.collection('customers').doc(user.uid).get();
-    if (!vendorDoc.exists) document.getElementById('vendor-btn').textContent = "Become a Vendor";
-    if (!customerDoc.exists) document.getElementById('customer-btn').textContent = "Join as Foodie";
+    if (vendorDoc.exists) {
+      document.getElementById('vendor-btn').textContent = vendorDoc.data().approved ? "Dashboard" : "Vendor Portal";
+      if (vendorDoc.data().approved) showVendorDashboard(vendorDoc.data());
+    } else {
+      document.getElementById('vendor-btn').textContent = "Become a Vendor";
+    }
+    if (customerDoc.exists) {
+      document.getElementById('customer-btn').textContent = "Foodie Hub";
+    } else {
+      document.getElementById('customer-btn').textContent = "Join as Foodie";
+    }
   } else {
     logoutBtn.classList.add('hidden');
     document.getElementById('vendor-btn').textContent = "Vendor Portal";
@@ -284,13 +299,13 @@ function updateTruckList() {
 
     if (currentHours >= startHours && currentHours <= endHours) {
       const card = document.createElement('div');
-      card.className = `truck-card bg-white shadow-md ${pin.live ? 'border-t-4 border-red-500' : ''}`;
+      card.className = `truck-card bg-white shadow-md ${pin.live ? 'border-t-4 border-pink-500' : ''}`;
       card.innerHTML = `
         <img src="${pin.productPhotos?.[0] || 'https://via.placeholder.com/300x150'}" alt="${pin.name}" class="w-full h-40 object-cover">
         <div class="p-4">
           <h3 class="text-xl font-semibold text-gray-900">${pin.name}</h3>
           <p class="text-gray-600">${pin.foodType} • ${pin.live ? 'Live Now' : 'Offline'}</p>
-          <p class="text-red-600 font-medium">${pin.avgRating || 'No'} ★ (${pin.ratingCount || 0} reviews)</p>
+          <p class="text-pink-600 font-medium">${pin.avgRating || 'No'} ★ (${pin.ratingCount || 0} reviews)</p>
         </div>
       `;
       card.onclick = () => showBusinessPage(pin);
@@ -319,11 +334,10 @@ async function showBusinessPage(pin) {
   const actions = document.getElementById('business-actions');
   document.getElementById('page-name').textContent = pin.name;
   document.getElementById('page-foodType').textContent = `Food Type: ${pin.foodType}`;
-  document.getElementById('page-contact').textContent = `Contact: ${pin.contact}`;
-  document.getElementById('page-address').textContent = `Address: ${pin.address}`;
   document.getElementById('page-hours').textContent = `Hours: ${pin.startTime} ${pin.startPeriod} - ${pin.endTime} ${pin.endPeriod}`;
-  document.getElementById('page-description').textContent = `Description: ${pin.description}`;
+  document.getElementById('page-description').textContent = pin.description;
   document.getElementById('page-specials').textContent = `Specials: ${pin.specials}`;
+  document.getElementById('page-vendor').textContent = `Vendor: ${pin.name}`;
   const photosDiv = document.getElementById('page-photos');
   photosDiv.innerHTML = '';
   if (pin.productPhotos && pin.productPhotos.length > 0) {
@@ -336,9 +350,25 @@ async function showBusinessPage(pin) {
     });
   }
 
+  const menuDiv = document.getElementById('page-menu');
+  menuDiv.innerHTML = '';
+  if (pin.menu && pin.menu.length > 0) {
+    pin.menu.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'flex justify-between items-center';
+      div.innerHTML = `
+        <p class="text-gray-900">${item.name}</p>
+        <p class="text-gray-600">$${(item.price * PRICE_MARKUP).toFixed(2)}</p>
+      `;
+      menuDiv.appendChild(div);
+    });
+  } else {
+    menuDiv.innerHTML = '<p class="text-gray-600">No menu available yet.</p>';
+  }
+
   actions.innerHTML = auth.currentUser ? `
     <div class="rating space-y-4">
-      <label class="text-gray-700 font-medium">Rate:</label>
+      <label class="text-gray-700 font-medium">Rate this truck</label>
       <select id="rating" class="w-full">
         <option value="1">1</option>
         <option value="2">2</option>
@@ -346,7 +376,7 @@ async function showBusinessPage(pin) {
         <option value="4">4</option>
         <option value="5">5</option>
       </select>
-      <textarea id="comment" placeholder="Leave a comment about your visit" rows="3" class="w-full"></textarea>
+      <textarea id="comment" placeholder="Tell us about your experience" rows="3" class="w-full"></textarea>
       <button id="submit-rating" class="btn-primary w-full">Submit Review</button>
     </div>
     <button onclick="showVisitModal('${pin.id}', '${pin.name}')" class="btn-primary w-full">Mark as Visited</button>
@@ -420,7 +450,10 @@ async function showReviews(pin) {
       const reviewDiv = document.createElement('div');
       reviewDiv.className = 'border-b border-gray-200 pb-4';
       reviewDiv.innerHTML = `
-        <p class="text-red-600 font-semibold">${data.rating} ★ <span class="text-gray-600">by ${data.reviewerName}</span></p>
+        <div class="flex items-center mb-2">
+          <p class="text-pink-600 font-semibold">${data.rating} ★</p>
+          <p class="text-gray-600 ml-2">${data.reviewerName}</p>
+        </div>
         <p class="text-gray-700">${data.comment}</p>
       `;
       reviewList.appendChild(reviewDiv);
@@ -585,7 +618,9 @@ function showVendorDashboard(vendorData) {
     `;
     menuItems.appendChild(div);
   });
-  document.getElementById('live-toggle').textContent = vendorData.live ? "Go Offline" : "Go Live";
+  const pinDoc = db.collection('pins').doc(auth.currentUser.uid).get().then(doc => {
+    document.getElementById('live-toggle').textContent = doc.exists && doc.data().live ? "Go Offline" : "Go Live";
+  });
   document.getElementById('live-toggle').onclick = () => toggleLiveStatus(auth.currentUser.uid, vendorData.live);
   document.getElementById('update-profile').onclick = () => updateVendorProfile(auth.currentUser.uid);
   initializeDashAutocomplete();
@@ -627,7 +662,7 @@ async function updateVendorProfile(userId) {
       coords.latitude = existingData.latitude;
       coords.longitude = existingData.longitude;
     }
-    const menuItems = Array.from(document.querySelectorAll('.menu-item')).map(item => ({
+    const menuItems = Array.from(document.querySelectorAll('#menu-items .flex')).map(item => ({
       name: item.querySelector('.menu-name').value,
       price: parseFloat(item.querySelector('.menu-price').value) || 0
     })).filter(item => item.name && item.price > 0);
